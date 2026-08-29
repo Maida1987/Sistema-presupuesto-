@@ -11,8 +11,7 @@ repuestos para camiones, cuyo modelo comercial central es:
 
 ## Estado del proyecto
 
-**Fase 0 (infraestructura + auth/RBAC) completa. Fase 1 (catálogo base) en
-curso — módulo de Clientes implementado como slice de referencia.**
+**Fases 0 (infraestructura + auth/RBAC) y 1 (catálogo base) completas.**
 
 El repositorio contiene el análisis funcional, la arquitectura, el modelo de
 datos, el diseño del motor de precios/importación de Excel, las pantallas
@@ -23,16 +22,18 @@ principales, la API, la estrategia de auditoría/testing y el plan de fases
   RBAC por permisos (`@RequirePermissions`), auditoría transversal
   (`AuditService`), numeración transaccional segura (`DocumentCountersService`
   con `SELECT ... FOR UPDATE`), esquema de base de datos completo (todas las
-  tablas de `docs/03-modelo-de-datos.md`) y CRUD de Clientes con tests
+  tablas de `docs/03-modelo-de-datos.md`), búsqueda tolerante con `pg_trgm`, y
+  CRUD completo de Clientes, Proveedores y Productos (maestro + referencias
+  de proveedor con sugerencia/confirmación de vinculación), todo con tests
   unitarios.
 - Frontend (`frontend/`): React + Vite + Tailwind + TanStack Query. Login,
-  ruta protegida, dashboard y pantalla de Clientes (buscar/listar/crear)
-  conectada a la API real.
+  ruta protegida, dashboard y pantallas de Clientes, Proveedores y Productos
+  (buscar/listar/crear) conectadas a la API real.
 
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): Proveedores/Productos/importación de
-Excel (Fase 1-2), Remitos (Fase 3), Cuenta corriente/Liquidación (Fase 4),
-Pagos (Fase 5), y el resto del plan.
+`docs/05-ux-api-testing-plan.md §5`): importación de Excel (Fase 2), Remitos
+(Fase 3), Cuenta corriente/Liquidación (Fase 4), Pagos (Fase 5), y el resto
+del plan.
 
 ## Cómo levantar el entorno de desarrollo
 

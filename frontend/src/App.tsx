@@ -3,6 +3,8 @@ import { AuthProvider } from './features/auth/AuthContext';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { CustomersPage } from './features/customers/CustomersPage';
+import { SuppliersPage } from './features/suppliers/SuppliersPage';
+import { ProductsPage } from './features/products/ProductsPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -27,6 +29,26 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <CustomersPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proveedores"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <SuppliersPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/productos"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ProductsPage />
               </AppShell>
             </ProtectedRoute>
           }

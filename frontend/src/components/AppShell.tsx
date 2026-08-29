@@ -5,6 +5,8 @@ import { useAuth } from '../features/auth/AuthContext';
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard' },
   { to: '/clientes', label: 'Clientes' },
+  { to: '/proveedores', label: 'Proveedores' },
+  { to: '/productos', label: 'Productos' },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
