@@ -45,7 +45,7 @@ ARCA, etc.).
       /search            (buscador global)
     /common
       /guards            (JwtAuthGuard, RolesGuard, PermissionsGuard)
-      /interceptors      (AuditInterceptor, TransformInterceptor)
+      /interceptors      (AuditService — invocado explícitamente por cada servicio)
       /pipes             (ValidationPipe compartido)
       /filters           (excepciones -> respuestas HTTP consistentes)
     /infra
@@ -100,7 +100,8 @@ respetando la separación exigida en el ítem 5 del brief.
   header para operaciones mutantes (no cookies simples de sesión); si se
   usa cookie para refresh, `SameSite=Strict` + verificación de origen.
 - **Rate limiting** en login y en endpoints de importación/liquidación.
-- **Logs y auditoría**: interceptor transversal que registra
+- **Logs y auditoría**: `AuditService`, invocado explícitamente por cada
+  servicio de dominio en la misma transacción que el cambio, registra
   usuario/fecha/hora/módulo/entidad/valor anterior/valor nuevo/IP para las
   operaciones marcadas como sensibles (ver `03-modelo-de-datos.md
   #audit_logs`).
@@ -140,7 +141,7 @@ lógica de negocio.
 - **Estados en vez de borrados**: remitos, liquidaciones, pagos y listas
   usan máquinas de estado (ver `03-modelo-de-datos.md`), con anulación
   explícita (usuario, fecha, motivo).
-- **Auditoría transversal**: `audit_logs` capturado por interceptor en
+- **Auditoría transversal**: `audit_logs` capturado por `AuditService` en
   operaciones de escritura sobre entidades sensibles, además de los campos
   de auditoría propios de cada tabla (`created_by`, `voided_by`, etc.).
 

@@ -1,0 +1,646 @@
+// Esquema de base de datos — ver docs/03-modelo-de-datos.md para el diseño
+// funcional completo (diagramas ER, máquinas de estado, justificación).
+//
+// Regla transversal: las tablas marcadas "[append-only]" en los comentarios
+// no se actualizan in-place desde la aplicación; toda corrección crea una
+// fila nueva y, cuando corresponde, cierra la vigencia de la anterior
+// (effective_to / valid_to).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identidad y permisos
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  roles              UserRole[]
+  createdCustomers   Customer[]            @relation("CustomerCreatedBy")
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Clientes y proveedores
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id                  String   @id @default(uuid())
+  internalCode        String   @unique @map("internal_code")
+  businessName        String   @map("business_name")
+  cuit                String?
+  dni                 String?
+  phone               String?
+  whatsapp            String?
+  email               String?
+  address             String?
+  city                String?
+  province            String?
+  commercialCondition String?  @map("commercial_condition")
+  creditLimit         Decimal? @map("credit_limit") @db.Decimal(14, 2)
+  status              CustomerStatus @default(ACTIVE)
+  notes               String?
+  createdById         String?  @map("created_by")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  createdBy User? @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+
+  deliveryNotes       DeliveryNote[]
+  accountMovements    AccountMovement[]
+  accountSettlements  AccountSettlement[]
+  payments            Payment[]
+
+  @@index([businessName])
+  @@map("customers")
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Supplier {
+  id     String   @id @default(uuid())
+  code   String   @unique
+  name   String
+  cuit   String?
+  contactInfo String? @map("contact_info")
+  status SupplierStatus @default(ACTIVE)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  productReferences ProductSupplierReference[]
+  priceLists        PriceList[]
+  importMappings    ImportMapping[]
+
+  @@map("suppliers")
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ---------------------------------------------------------------------------
+// Productos
+// ---------------------------------------------------------------------------
+
+model ProductCategory {
+  id       String  @id @default(uuid())
+  name     String
+  parentId String? @map("parent_id")
+
+  parent   ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  internalCode      String   @unique @map("internal_code")
+  description       String
+  brand             String?
+  categoryId        String?  @map("category_id")
+  unit              String?
+  truckApplication  String?  @map("truck_application")
+  status            ProductStatus @default(ACTIVE)
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  category           ProductCategory?           @relation(fields: [categoryId], references: [id])
+  supplierReferences ProductSupplierReference[]
+  priceHistory       PriceHistory[]
+  deliveryNoteItems  DeliveryNoteItem[]
+
+  @@index([description])
+  @@map("products")
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Referencia de un producto tal como lo identifica un proveedor puntual.
+/// Código y descripción se conservan EXACTAMENTE como llegan del proveedor
+/// (ver docs/03-modelo-de-datos.md — nunca se sobrescribe el dato original).
+model ProductSupplierReference {
+  id                   String   @id @default(uuid())
+  productId            String?  @map("product_id")
+  supplierId           String   @map("supplier_id")
+  supplierCode         String   @map("supplier_code")
+  supplierDescription  String   @map("supplier_description")
+  matchStatus          MatchStatus @default(UNMATCHED) @map("match_status")
+  matchedById          String?  @map("matched_by")
+  matchedAt            DateTime? @map("matched_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  product  Product? @relation(fields: [productId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  priceListItems     PriceListItem[]
+  priceHistoryEntries PriceHistory[]
+  deliveryNoteItems  DeliveryNoteItem[]
+
+  @@unique([supplierId, supplierCode])
+  @@map("product_supplier_references")
+}
+
+enum MatchStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+// ---------------------------------------------------------------------------
+// Importación de listas de precios
+// ---------------------------------------------------------------------------
+
+model ImportedFile {
+  id               String   @id @default(uuid())
+  supplierId       String   @map("supplier_id")
+  originalFilename String   @map("original_filename")
+  storageKey       String   @map("storage_key")
+  sha256Hash       String   @map("sha256_hash")
+  uploadedById     String   @map("uploaded_by")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+
+  priceLists PriceList[]
+
+  @@map("imported_files")
+}
+
+/// Mapeo de columnas guardado por proveedor (ver docs/04-importacion-y-precios.md).
+model ImportMapping {
+  id               String   @id @default(uuid())
+  supplierId       String   @unique @map("supplier_id")
+  columnMapping    Json     @map("column_mapping")
+  detectedHeaders  Json?    @map("detected_headers")
+  updatedById      String   @map("updated_by")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("import_mappings")
+}
+
+/// [append-only] Cada import es un lote nuevo e inmutable; una hoja de Excel
+/// puede producir varias price_lists (una lista de precios por hoja).
+model PriceList {
+  id             String   @id @default(uuid())
+  supplierId     String   @map("supplier_id")
+  importedFileId String   @map("imported_file_id")
+  sheetName      String?  @map("sheet_name")
+  effectiveDate  DateTime @map("effective_date") @db.Date
+  currency       String   @default("ARS")
+  importedAt     DateTime @default(now()) @map("imported_at")
+  importedById   String   @map("imported_by")
+  status         PriceListStatus @default(PROCESSED)
+  notes          String?
+
+  supplier     Supplier      @relation(fields: [supplierId], references: [id])
+  importedFile ImportedFile  @relation(fields: [importedFileId], references: [id])
+  items        PriceListItem[]
+  errors       ImportError[]
+
+  @@map("price_lists")
+}
+
+enum PriceListStatus {
+  PROCESSED
+  PARTIAL
+  FAILED
+}
+
+/// [append-only] Nunca se actualiza un ítem ya importado.
+model PriceListItem {
+  id                   String   @id @default(uuid())
+  priceListId          String   @map("price_list_id")
+  supplierReferenceId  String   @map("supplier_reference_id")
+  price                Decimal  @db.Decimal(14, 4)
+  currency             String   @default("ARS")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  priceList          PriceList                @relation(fields: [priceListId], references: [id])
+  supplierReference  ProductSupplierReference @relation(fields: [supplierReferenceId], references: [id])
+  priceHistoryEntries PriceHistory[]
+
+  @@map("price_list_items")
+}
+
+model ImportError {
+  id           String   @id @default(uuid())
+  priceListId  String   @map("price_list_id")
+  rowNumber    Int      @map("row_number")
+  rawData      Json     @map("raw_data")
+  errorType    String   @map("error_type")
+  errorMessage String   @map("error_message")
+
+  priceList PriceList @relation(fields: [priceListId], references: [id])
+
+  @@map("import_errors")
+}
+
+// ---------------------------------------------------------------------------
+// Precios y márgenes
+// ---------------------------------------------------------------------------
+
+/// [append-only, versionada] Ver docs/04-importacion-y-precios.md §6.
+model PricingRule {
+  id             String   @id @default(uuid())
+  scope          PricingRuleScope
+  scopeRefId     String?  @map("scope_ref_id")
+  marginPct      Decimal  @map("margin_pct") @db.Decimal(6, 4)
+  marginBase     MarginBase @map("margin_base")
+  expensesPct    Decimal  @default(0) @map("expenses_pct") @db.Decimal(6, 4)
+  expensesFixed  Decimal  @default(0) @map("expenses_fixed") @db.Decimal(14, 2)
+  ivaPct         Decimal  @map("iva_pct") @db.Decimal(6, 4)
+  roundingRule   String   @map("rounding_rule")
+  effectiveFrom  DateTime @default(now()) @map("effective_from")
+  effectiveTo    DateTime? @map("effective_to")
+  createdById    String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  priceHistoryEntries PriceHistory[]
+
+  @@map("pricing_rules")
+}
+
+enum PricingRuleScope {
+  GLOBAL
+  CATEGORY
+  SUPPLIER
+  PRODUCT
+}
+
+enum MarginBase {
+  COST
+  SALE_PRICE
+}
+
+/// [append-only] Responde "qué precio calculó el sistema para este producto
+/// en la fecha X" sin recomputar cruces entre listas y reglas cada vez.
+model PriceHistory {
+  id                      String   @id @default(uuid())
+  productId               String   @map("product_id")
+  supplierReferenceId     String?  @map("supplier_reference_id")
+  pricingRuleId           String   @map("pricing_rule_id")
+  sourcePriceListItemId   String?  @map("source_price_list_item_id")
+  netPrice                Decimal  @map("net_price") @db.Decimal(14, 4)
+  computedPublicPrice     Decimal  @map("computed_public_price") @db.Decimal(14, 2)
+  sourceType              PriceSourceType @map("source_type")
+  manualReason            String?  @map("manual_reason")
+  manualAuthorizedById    String?  @map("manual_authorized_by")
+  effectiveFrom           DateTime @default(now()) @map("effective_from")
+  effectiveTo             DateTime? @map("effective_to")
+
+  product              Product                   @relation(fields: [productId], references: [id])
+  supplierReference    ProductSupplierReference? @relation(fields: [supplierReferenceId], references: [id])
+  pricingRule          PricingRule               @relation(fields: [pricingRuleId], references: [id])
+  sourcePriceListItem  PriceListItem?            @relation(fields: [sourcePriceListItemId], references: [id])
+
+  settlementItems AccountSettlementItem[]
+
+  @@index([productId, effectiveFrom])
+  @@map("price_history")
+}
+
+enum PriceSourceType {
+  LIST_IMPORT
+  MANUAL
+}
+
+// ---------------------------------------------------------------------------
+// Remitos
+// ---------------------------------------------------------------------------
+
+/// Numeración transaccional segura (ver docs/02-arquitectura.md §4):
+/// el próximo número se obtiene con SELECT ... FOR UPDATE sobre esta fila,
+/// nunca con MAX(numero)+1.
+model DocumentCounter {
+  id         String @id @default(uuid())
+  docType    String @map("doc_type")
+  series     String
+  year       Int
+  lastNumber Int    @default(0) @map("last_number")
+
+  @@unique([docType, series, year])
+  @@map("document_counters")
+}
+
+model DeliveryNote {
+  id         String   @id @default(uuid())
+  number     Int
+  series     String
+  customerId String   @map("customer_id")
+  issuedAt   DateTime @default(now()) @map("issued_at")
+  status     DeliveryNoteStatus @default(BORRADOR)
+  createdById String  @map("created_by")
+  voidReason String?  @map("void_reason")
+  voidedById String?  @map("voided_by")
+  voidedAt   DateTime? @map("voided_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  items       DeliveryNoteItem[]
+  documents   DeliveryNoteDocument[]
+  statusLog   DeliveryNoteStatusHistory[]
+
+  @@unique([series, number])
+  @@index([customerId, status])
+  @@map("delivery_notes")
+}
+
+enum DeliveryNoteStatus {
+  BORRADOR
+  EMITIDO
+  ENTREGADO
+  FIRMADO
+  LIQUIDADO
+  ANULADO
+}
+
+model DeliveryNoteItem {
+  id                    String  @id @default(uuid())
+  deliveryNoteId        String  @map("delivery_note_id")
+  productId             String  @map("product_id")
+  supplierReferenceId   String? @map("supplier_reference_id")
+  quantity              Decimal @db.Decimal(12, 3)
+  unit                  String?
+  codeSnapshot          String  @map("code_snapshot")
+  descriptionSnapshot   String  @map("description_snapshot")
+  settlementItemId      String? @unique @map("settlement_item_id")
+  stockMovementId       String? @unique @map("stock_movement_id")
+
+  deliveryNote       DeliveryNote              @relation(fields: [deliveryNoteId], references: [id])
+  product            Product                   @relation(fields: [productId], references: [id])
+  supplierReference  ProductSupplierReference? @relation(fields: [supplierReferenceId], references: [id])
+  settlementItem     AccountSettlementItem?    @relation(fields: [settlementItemId], references: [id])
+  stockMovement      StockMovement?            @relation(fields: [stockMovementId], references: [id])
+
+  @@map("delivery_note_items")
+}
+
+model DeliveryNoteDocument {
+  id             String   @id @default(uuid())
+  deliveryNoteId String   @map("delivery_note_id")
+  type           DeliveryNoteDocumentType
+  storageKey     String   @map("storage_key")
+  uploadedById   String   @map("uploaded_by")
+  uploadedAt     DateTime @default(now()) @map("uploaded_at")
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id])
+
+  @@map("delivery_note_documents")
+}
+
+enum DeliveryNoteDocumentType {
+  ORIGINAL_PDF
+  DUPLICADO_PDF
+  FIRMADO_SCAN
+}
+
+/// Auditoría específica de la máquina de estados del remito.
+model DeliveryNoteStatusHistory {
+  id             String   @id @default(uuid())
+  deliveryNoteId String   @map("delivery_note_id")
+  fromStatus     DeliveryNoteStatus? @map("from_status")
+  toStatus       DeliveryNoteStatus  @map("to_status")
+  changedById    String   @map("changed_by")
+  changedAt      DateTime @default(now()) @map("changed_at")
+  reason         String?
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id])
+
+  @@map("delivery_note_status_history")
+}
+
+// ---------------------------------------------------------------------------
+// Cuenta corriente
+// ---------------------------------------------------------------------------
+
+/// [append-only] El saldo del cliente siempre puede recalcularse sumando
+/// esta tabla; balance_after se graba en la misma transacción como cache.
+model AccountMovement {
+  id            String   @id @default(uuid())
+  customerId    String   @map("customer_id")
+  movementDate  DateTime @map("movement_date") @db.Date
+  type          AccountMovementType
+  referenceType String   @map("reference_type")
+  referenceId   String   @map("reference_id")
+  debit         Decimal  @default(0) @db.Decimal(14, 2)
+  credit        Decimal  @default(0) @db.Decimal(14, 2)
+  balanceAfter  Decimal  @map("balance_after") @db.Decimal(14, 2)
+  createdById   String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, movementDate])
+  @@map("account_movements")
+}
+
+enum AccountMovementType {
+  REMITO_PENDIENTE
+  LIQUIDACION
+  PAGO
+  AJUSTE
+}
+
+model AccountSettlement {
+  id           String   @id @default(uuid())
+  customerId   String   @map("customer_id")
+  periodFrom   DateTime @map("period_from") @db.Date
+  periodTo     DateTime @map("period_to") @db.Date
+  totalAmount  Decimal  @default(0) @map("total_amount") @db.Decimal(14, 2)
+  status       SettlementStatus @default(BORRADOR)
+  generatedById String  @map("generated_by")
+  voidedById   String?  @map("voided_by")
+  voidedAt     DateTime? @map("voided_at")
+  voidReason   String?  @map("void_reason")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  items    AccountSettlementItem[]
+
+  @@map("account_settlements")
+}
+
+enum SettlementStatus {
+  BORRADOR
+  CONFIRMADA
+  ANULADA
+}
+
+/// Esta tabla ES la trazabilidad exigida por el brief: cada ítem liquidado
+/// referencia el remito de origen y el precio histórico usado, con el
+/// detalle completo del cálculo (price_breakdown).
+model AccountSettlementItem {
+  id                  String   @id @default(uuid())
+  settlementId        String   @map("settlement_id")
+  priceHistoryId      String   @map("price_history_id")
+  unitPrice           Decimal  @map("unit_price") @db.Decimal(14, 2)
+  quantity             Decimal  @db.Decimal(12, 3)
+  subtotal            Decimal  @db.Decimal(14, 2)
+  marginPctApplied     Decimal? @map("margin_pct_applied") @db.Decimal(6, 4)
+  expensesPctApplied   Decimal? @map("expenses_pct_applied") @db.Decimal(6, 4)
+  ivaPctApplied        Decimal? @map("iva_pct_applied") @db.Decimal(6, 4)
+  priceBreakdown       Json?    @map("price_breakdown")
+
+  settlement   AccountSettlement @relation(fields: [settlementId], references: [id])
+  priceHistory PriceHistory      @relation(fields: [priceHistoryId], references: [id])
+  deliveryNoteItem DeliveryNoteItem?
+
+  @@map("account_settlement_items")
+}
+
+// ---------------------------------------------------------------------------
+// Pagos
+// ---------------------------------------------------------------------------
+
+model PaymentMethod {
+  id               String  @id @default(uuid())
+  name             String  @unique
+  requiresReference Boolean @default(false) @map("requires_reference")
+  active           Boolean @default(true)
+
+  payments Payment[]
+
+  @@map("payment_methods")
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  customerId      String   @map("customer_id")
+  paymentDate     DateTime @map("payment_date") @db.Date
+  amount          Decimal  @db.Decimal(14, 2)
+  paymentMethodId String   @map("payment_method_id")
+  referenceNumber String?  @map("reference_number")
+  notes           String?
+  createdById     String   @map("created_by")
+  status          PaymentStatus @default(REGISTRADO)
+  voidedById      String?  @map("voided_by")
+  voidedAt        DateTime? @map("voided_at")
+  voidReason      String?  @map("void_reason")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  REGISTRADO
+  ANULADO
+}
+
+// ---------------------------------------------------------------------------
+// Auditoría
+// ---------------------------------------------------------------------------
+
+/// [append-only]
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  module     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId, occurredAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Preparado para stock (futuro, no bloqueante — ver docs/02-arquitectura.md §8)
+// ---------------------------------------------------------------------------
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  productId   String   @map("product_id")
+  movementType String  @map("movement_type")
+  quantity    Decimal  @db.Decimal(12, 3)
+  warehouseId String?  @map("warehouse_id")
+  movementDate DateTime @default(now()) @map("movement_date")
+  createdById String   @map("created_by")
+  status      String   @default("REGISTRADO")
+
+  deliveryNoteItem DeliveryNoteItem?
+
+  @@map("stock_movements")
+}

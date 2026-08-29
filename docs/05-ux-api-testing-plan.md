@@ -83,8 +83,11 @@ irreversible (anular, confirmar liquidación, registrar pago).
 | `/audit-logs` | `GET ?entityType=&entityId=` (solo admin) |
 
 Todos los endpoints mutantes validan permisos vía `PermissionsGuard` y
-quedan cubiertos por el `AuditInterceptor` cuando afectan una entidad
-sensible (precios, remitos, liquidaciones, pagos, clientes).
+registran auditoría a través de `AuditService` cuando afectan una entidad
+sensible (precios, remitos, liquidaciones, pagos, clientes). Se optó por
+una llamada explícita del servicio (en la misma transacción que el cambio)
+en lugar de un interceptor genérico: solo el servicio de cada entidad sabe
+construir un `old_value`/`new_value` preciso.
 
 ## 3. Estrategia de testing
 
@@ -114,8 +117,8 @@ pantalla" (ver criterio de terminado, §4).
 
 | Fase | Alcance | Depende de | Criterio de cierre |
 |---|---|---|---|
-| **0 — Base** | Infra (Docker Compose, CI), auth + RBAC, esqueleto de módulos backend/frontend, `document_counters`, `audit_logs` | — | Login funcional, roles aplicados, pipeline de tests corriendo |
-| **1 — Catálogo base** | Clientes, Proveedores, Productos maestro + referencias de proveedor, búsqueda tolerante | Fase 0 | Alta/consulta de las tres entidades con tests de integración |
+| **0 — Base** ✅ | Infra (Docker Compose), auth + RBAC, esqueleto de módulos backend/frontend, `document_counters`, `audit_logs`, esquema completo de base de datos | — | Login funcional, roles aplicados, tests corriendo |
+| **1 — Catálogo base** 🔄 (Clientes ✅, Proveedores/Productos pendientes) | Clientes, Proveedores, Productos maestro + referencias de proveedor, búsqueda tolerante | Fase 0 | Alta/consulta de las tres entidades con tests de integración |
 | **2 — Importación y precios** | Import de Excel (mapeo, preview, calidad de datos), `price_lists`/`price_list_items`, `pricing_rules` y `price_history` con la fórmula documentada en `04-importacion-y-precios.md` (⚠️ requiere confirmación de negocio antes de cerrar esta fase) | Fase 1 | Importación E2E de un Excel real de cada formato de ejemplo, comparador de precios funcionando |
 | **3 — Remitos** | Emisión, numeración transaccional, PDF original/duplicado sin precios, estados, adjunto de remito firmado | Fase 1 | Un vendedor emite un remito en < 1 minuto; estado y documento firmado consultables |
 | **4 — Cuenta corriente y liquidación** | `account_movements`, `account_settlements`, pantalla de liquidación con trazabilidad y comparador inline | Fases 2 y 3 | Liquidación de un cliente con remitos de fechas distintas, precios correctos y trazables, bloqueo si falta precio |
