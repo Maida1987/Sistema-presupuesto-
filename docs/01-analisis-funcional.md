@@ -102,7 +102,7 @@ flowchart TD
 |---|---|
 | Doble numeración de remitos con múltiples vendedores | Contador transaccional con bloqueo de fila (`SELECT ... FOR UPDATE`), nunca `MAX(numero)+1` |
 | Excel de proveedor con formato distinto rompe la importación | Mapeo de columnas asistido + guardado por proveedor, validación de calidad antes de aplicar |
-| Producto sin precio al momento de liquidar | Liquidación nunca se genera "silenciosamente incompleta"; se bloquea y se ofrece resolución explícita (ver `04-importacion-y-precios.md §5`) |
+| Producto sin precio al momento de liquidar | Liquidación nunca se genera "silenciosamente incompleta"; se bloquea y se ofrece resolución explícita (ver `04-importacion-y-precios.md §8`) |
 | Pérdida de trazabilidad al actualizar precios/reglas | Todo cambio de precio o de regla crea una fila nueva (versionado), nunca `UPDATE` sobre el valor histórico |
 | Doble liquidación o doble pago con usuarios concurrentes | Transacciones de base de datos + bloqueo optimista/pesimista sobre remitos y liquidaciones en curso |
 | Disputa sobre mercadería entregada | Remito firmado digitalizado, siempre recuperable desde la cuenta corriente |
@@ -125,8 +125,20 @@ del brief):
    confirmar).
 3. Redondeo: ¿a qué unidad (peso, decena, centena) y hacia qué lado (arriba,
    más cercano)?
-4. Moneda: ¿todo en ARS? ¿Hay proveedores con listas en USD que requieran
-   tipo de cambio?
+4. ~~Moneda: ¿todo en ARS? ¿Hay proveedores con listas en USD que requieran
+   tipo de cambio?~~ **Confirmado con datos reales**: la lista de MERCOSIL
+   analizada trae, dentro del mismo archivo, hojas en pesos (LPG,
+   AMORTIGUADORES) y hojas en dólares (IMPORTADOS, FEY) con la leyenda "se
+   aplicará tipo de cambio vendedor del Banco Nación al día de la
+   transacción". El modelo ya soporta `currency` por lista/ítem (ver
+   `03-modelo-de-datos.md`). Queda pendiente definir: **¿"día de la
+   transacción" es la fecha de retiro (remito) o la fecha de liquidación?**
+   Dado que el precio se fija recién al liquidar (regla fundamental del
+   sistema, §1), se propone usar la fecha de liquidación salvo que el
+   proveedor facture al comercio con el tipo de cambio del retiro — a
+   confirmar. También falta definir la fuente del tipo de cambio (cargado
+   manualmente por el administrador vs. integración con un servicio de
+   cotización).
 5. Numeración de remitos: ¿una única serie o series por punto de venta /
    vendedor? ¿Requiere correlatividad fiscal (AFIP/ARCA) o es puramente
    interna (dado que no es un comprobante fiscal)?

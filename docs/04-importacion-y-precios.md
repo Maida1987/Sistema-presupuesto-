@@ -49,6 +49,12 @@ Este mecanismo es agnóstico del layout exacto: resuelve los tres ejemplos
 del brief (`Código|Descripción|Precio`, `Código Producto|Detalle|Precio
 Neto`, `SKU|Producto|Costo`) sin código específico por proveedor.
 
+No todos los proveedores envían una fila de encabezados de texto
+reconocible (hay casos reales sin ninguna fila "Código/Descripción/Precio"
+y con varias listas dentro del mismo archivo, una por hoja): el mecanismo
+completo de detección de inicio de tabla y el modo de mapeo por posición
+de columna se describen en el caso real §9.
+
 ## 3. Control de calidad antes de aplicar (bloquea la importación silenciosa)
 
 Antes de confirmar la importación se ejecutan validaciones y se muestran
@@ -63,6 +69,10 @@ como resumen accionable (no solo un log):
   advertencia, no bloquea, pero requiere confirmación explícita.
 - Columnas presentes en el archivo que no fueron mapeadas a ningún campo
   canónico → se informan, no se descartan silenciosamente.
+- **Filas de sección/categoría no cuentan como filas inválidas** (código y
+  precio vacíos pero con texto descriptivo): se reconocen como
+  encabezado de categoría, no se listan en `import_errors` — ver caso real
+  §9.1.
 
 Las filas inválidas van a `import_errors` con el detalle de la fila cruda y
 el motivo; el resto de la lista se procesa igual (la importación es
@@ -191,3 +201,73 @@ producto en la fecha de liquidación, la pantalla de liquidación:
    dejarlo pendiente e informar al administrador.
 
 Esto implementa el ítem 46 sin excepciones silenciosas.
+
+## 9. Caso real analizado: listas MERCOSIL (multi-hoja)
+
+Se analizó un archivo real de un proveedor (`MERCOSIL_LISTAS_DE_PRECIOS`)
+que obliga a afinar el diseño anterior. Estructura encontrada:
+
+- **4 hojas en un mismo archivo**: `LPG`, `IMPORTADOS`, `FEY`,
+  `AMORTIGUADORES` — cada una es una **lista de precios independiente**
+  (rubro/marca propia), con su propia fecha de vigencia y, en dos de las
+  cuatro, su propia moneda.
+- **Bloque de metadata antes de la tabla** (no tabular): título "LISTA DE
+  PRECIOS", subtítulo de rubro, "VIGENCIA / DESDE EL 24/08/2026",
+  condiciones de venta, aviso de moneda ("Precios netos expresados en
+  dólares... tipo de cambio vendedor del Banco Nación"), aviso "no
+  incluyen I.V.A.", datos de contacto. La tabla de ítems empieza recién
+  después de este bloque (en este archivo, entre la fila 50 y 54 según la
+  hoja).
+- **No existe una fila de encabezados de columna** tipo "Código |
+  Descripción | Precio": la tabla arranca directo en filas de datos.
+  Columna A = código, B = descripción, C = precio, por **posición**, no
+  por texto de encabezado.
+- **Filas de categoría/subcategoría intercaladas** dentro de la tabla (ej.
+  `FRENOS`, `ARANDELAS DE LEVA DE FRENO`, `BUJES VARIOS DE CRUCETA Y LEVA
+  DE FRENO`): solo tienen texto en la columna de descripción, sin código
+  ni precio.
+- **Formato de precio heterogéneo entre hojas**: número flotante con ruido
+  de coma flotante (`332.40374999999995`), número entero en USD (`160`), o
+  string con formato moneda (`"$ 121,271.26"`, con símbolo y separador de
+  miles).
+
+### 9.1 Ajustes de diseño que este caso confirma como necesarios
+
+1. **Un archivo puede producir varias `price_lists`.** El modelo ya lo
+   soporta (`imported_files 1—N price_lists`, ver
+   `03-modelo-de-datos.md`): el wizard de importación debe listar las
+   hojas del archivo y dejar elegir cuáles importar (por defecto, todas),
+   creando un `price_list` por hoja, cada uno con su propia
+   `effective_date` y moneda.
+2. **Detección de tabla en dos fases**, no "encabezado en la fila 1":
+   primero se busca la fila de inicio de datos (heurística: primera fila
+   donde, mirando un lote de filas siguientes, una columna es
+   predominantemente numérica de forma sostenida), y recién ahí se intenta
+   mapear encabezados de texto. Si no hay encabezados de texto plausibles
+   en esa fila (como en este caso), el mapeo cae a **modo posicional**
+   (columna 1/2/3 = código/descripción/precio), que el usuario puede
+   corregir manualmente y guardar como `import_mappings` para ese
+   proveedor (ej. `{"mode": "positional", "code": "A", "description": "B",
+   "price": "C"}`).
+3. **Filas de sección no son errores.** Una fila sin código y sin precio
+   pero con texto en la columna de descripción se reconoce como
+   encabezado de categoría/subcategoría, no se manda a `import_errors`, y
+   opcionalmente alimenta `product_categories`/`subcategory` de los ítems
+   que le siguen hasta la próxima fila de sección.
+4. **Normalización de precio** debe soportar: valor numérico directo,
+   valor numérico con ruido decimal (redondear a 2 decimales al
+   persistir), y string con símbolo de moneda/separador de miles
+   (`"$ 121,271.26"` → `121271.26`), detectando el separador decimal según
+   corresponda.
+5. **Extracción asistida de metadata de cabecera**: la fecha de vigencia
+   ("DESDE EL 24/08/2026") y la moneda ("expresados en pesos/dólares") se
+   proponen automáticamente como valores de `price_lists.effective_date` y
+   `currency` a partir del texto del bloque de metadata (patrón "DESDE EL
+   \<fecha\>" y "expresados en \<moneda\>"), pero **siempre editables por
+   el usuario antes de confirmar** — nunca se asumen en silencio.
+6. Confirma el supuesto ya documentado en §6.2 de que el costo del
+   proveedor **no incluye IVA** (viene declarado explícitamente en el
+   texto del proveedor).
+
+Este caso queda como fixture de referencia para las pruebas unitarias del
+parser de importación (Fase 2 del plan, ver `05-ux-api-testing-plan.md`).
