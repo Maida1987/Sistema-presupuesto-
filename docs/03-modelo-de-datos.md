@@ -308,6 +308,16 @@ stateDiagram-v2
 ```
 `ANULADO` genera un movimiento contrario en `account_movements`.
 
+> **Estado: implementado (Fase 5)**, en `backend/src/modules/payments/`.
+> Reutiliza el mismo `AccountMovementsService` de Liquidación (Fase 4) —
+> un pago y una liquidación son, para el libro de movimientos, la misma
+> operación (crear un movimiento con bloqueo de fila del cliente), solo
+> cambia el signo (crédito en vez de débito) y el `reference_type`. Un
+> medio de pago puede marcarse para exigir número de comprobante
+> (`payment_methods.requires_reference` — los medios sembrados por defecto
+> no lo exigen, es configurable por medio); si lo exige y no se informa,
+> se rechaza antes de crear el pago.
+
 ### Importación de lista de precios
 ```mermaid
 stateDiagram-v2

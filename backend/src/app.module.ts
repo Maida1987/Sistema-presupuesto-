@@ -9,6 +9,7 @@ import { PricingRulesModule } from './modules/pricing-rules/pricing-rules.module
 import { PriceListsModule } from './modules/price-lists/price-lists.module';
 import { DeliveryNotesModule } from './modules/delivery-notes/delivery-notes.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { DocumentCountersModule } from './modules/document-counters/document-counters.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { DocumentCountersModule } from './modules/document-counters/document-cou
     PriceListsModule,
     DeliveryNotesModule,
     AccountsModule,
+    PaymentsModule,
     DocumentCountersModule,
   ],
 })

@@ -13,6 +13,7 @@ import { DeliveryNoteDetailPage } from './features/delivery-notes/DeliveryNoteDe
 import { CustomerAccountPage } from './features/accounts/CustomerAccountPage';
 import { NewSettlementPage } from './features/accounts/NewSettlementPage';
 import { SettlementDetailPage } from './features/accounts/SettlementDetailPage';
+import { PaymentDetailPage } from './features/payments/PaymentDetailPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -137,6 +138,16 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <SettlementDetailPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pagos/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <PaymentDetailPage />
               </AppShell>
             </ProtectedRoute>
           }

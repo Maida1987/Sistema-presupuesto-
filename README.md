@@ -11,77 +11,57 @@ repuestos para camiones, cuyo modelo comercial central es:
 
 ## Estado del proyecto
 
-**Fases 0 (infraestructura + auth/RBAC), 1 (catálogo base), 2 (importación
-y precios), 3 (remitos) y 4 (cuenta corriente y liquidación) completas.**
+**El flujo de negocio central está completo: Fases 0 a 5 del plan
+implementadas** (infraestructura/auth, catálogo, importación de precios,
+remitos, cuenta corriente/liquidación, pagos). El ciclo completo
+`cliente → remito → firma → liquidación → pago` funciona de punta a punta,
+validado contra PostgreSQL real y en el navegador.
 
-El repositorio contiene el análisis funcional, la arquitectura, el modelo de
-datos, el diseño del motor de precios/importación de Excel, las pantallas
-principales, la API, la estrategia de auditoría/testing y el plan de fases
-(ver `docs/`), y a partir de ese análisis ya está implementado:
+| Módulo | Backend (`backend/src/modules/`) | Frontend (`frontend/src/features/`) |
+|---|---|---|
+| Auth / RBAC | `auth/` — JWT access+refresh, permisos (`@RequirePermissions`) | login, ruta protegida |
+| Auditoría | `common/interceptors/audit.service.ts` — invocado por cada servicio de dominio | — |
+| Clientes / Proveedores | `customers/`, `suppliers/` — CRUD, búsqueda tolerante (`pg_trgm`) | `customers/`, `suppliers/` |
+| Productos | `products/` — maestro + referencias de proveedor, matching por similitud, comparador de precios | `products/` |
+| Importación de listas | `price-lists/` — detección de columnas (sinónimos o posicional), metadata, control de calidad, multi-hoja | `price-lists/` — wizard analizar→previsualizar→confirmar |
+| Motor de precios | `pricing-rules/` — reglas versionadas por scope, `price_history` | `pricing-rules/` |
+| Remitos | `delivery-notes/` — numeración transaccional, estados, PDF sin precios (`pdf-lib`), adjunto de firma | `delivery-notes/` |
+| Cuenta corriente / Liquidación | `accounts/` — detección de pendientes, resolución de precio con trazabilidad completa, confirmación transaccional, anulación con reverso | `accounts/` |
+| Pagos | `payments/` — registro/anulación, reutiliza el mismo libro de movimientos que Liquidación | `payments/` |
+| Numeración segura | `document-counters/` — `SELECT ... FOR UPDATE`, reutilizable dentro de una transacción del llamador | — |
 
-- Backend (`backend/`): NestJS + Prisma + PostgreSQL. Login/refresh con JWT,
-  RBAC por permisos (`@RequirePermissions`), auditoría transversal
-  (`AuditService`), numeración transaccional segura (`DocumentCountersService`
-  con `SELECT ... FOR UPDATE`), esquema de base de datos completo (todas las
-  tablas de `docs/03-modelo-de-datos.md`), búsqueda tolerante con `pg_trgm`,
-  CRUD completo de Clientes, Proveedores y Productos (maestro + referencias
-  de proveedor con sugerencia/confirmación de vinculación), e importación
-  inteligente de listas de Excel (detección de columnas por sinónimos o modo
-  posicional, extracción de metadata, control de calidad, multi-hoja) +
-  motor de precios versionado (`pricing_rules`/`price_history`) con
-  trazabilidad completa. Todo con tests unitarios, incluyendo una suite de
-  integración contra un Excel real de proveedor con 4 hojas heterogéneas
-  (`backend/test/fixtures/mercosil-listas-precios.xlsx`). También emisión
-  de remitos con numeración transaccional (reservar el número y
-  crear el remito son una única transacción atómica), máquina de estados
-  completa (EMITIDO → ENTREGADO → FIRMADO, con ANULADO desde cualquiera de
-  esos estados salvo LIQUIDADO), generación de PDF **sin precios en ningún
-  campo** (original y duplicado, con `pdf-lib`), y adjunto del remito
-  firmado (PDF/JPG/PNG) con auditoría e historial de transiciones. Y el
-  módulo de cuenta corriente/liquidación (`modules/accounts/`): detecta
-  remitos firmados pendientes por cliente, resuelve el precio vigente de
-  cada ítem contra todos los proveedores que lo tienen (mostrando el
-  origen completo — proveedor, lista, margen/gastos/IVA — para que se
-  pueda reconstruir de dónde salió cada precio), genera la liquidación
-  como borrador reservando esos ítems (evita que dos liquidaciones
-  concurrentes tomen el mismo remito), y al confirmarla impacta la cuenta
-  corriente con un movimiento transaccional (`AccountMovementsService`,
-  con bloqueo de fila del cliente para que el saldo sea correcto incluso
-  con liquidaciones concurrentes — verificado con dos confirmaciones en
-  paralelo reales) y marca los remitos como `LIQUIDADO`. Anular una
-  liquidación revierte todo: libera los remitos, los devuelve a `FIRMADO`
-  y genera el movimiento de ajuste contrario, nunca borra nada.
-- Frontend (`frontend/`): React + Vite + Tailwind + TanStack Query. Login,
-  ruta protegida, dashboard, pantallas de Clientes/Proveedores/Productos
-  (con comparador de precios entre proveedores), wizard de importación de
-  listas (analizar → previsualizar → confirmar), administración de reglas
-  de precios, el flujo de remitos (alta rápida por cliente + búsqueda de
-  producto, detalle con PDF/adjuntar firma/anular, listado), y cuenta
-  corriente/liquidación (vista de cuenta con saldo y movimientos, wizard de
-  liquidación con la transparencia de precio completa por ítem, detalle de
-  liquidación con desglose y anulación).
+68 tests unitarios (incluyendo una suite de integración contra un Excel
+real de proveedor con 4 hojas heterogéneas,
+`backend/test/fixtures/mercosil-listas-precios.xlsx`), todos en verde.
+Detalle completo de cada fase en `docs/05-ux-api-testing-plan.md §5` y en
+las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
 
 **Limitaciones conocidas** (documentadas, no bloquean el resto del plan):
 - El cálculo de `price_history` solo corre para listas en ARS; para listas
   en USD queda pendiente la conversión de moneda (ver pregunta abierta de
   tipo de cambio en `docs/01-analisis-funcional.md §8`) — el precio de lista
   igual se importa y queda trazable.
-- El archivo original (listas de precios y remitos firmados) se guarda en
-  disco local (`backend/uploads/`, ver `FileStorageService`), no todavía en
+- Los archivos (listas de precios, remitos firmados) se guardan en disco
+  local (`backend/uploads/`, ver `FileStorageService`), no todavía en
   S3/MinIO como propone la arquitectura para producción — la interfaz ya
   está pensada para ese reemplazo sin tocar los servicios que la usan.
 - La importación de Excel es síncrona (sin cola/BullMQ); funciona bien para
   los volúmenes probados (cientos de filas) pero no está pensada aún para
   archivos de cientos de miles de filas.
-- Durante la implementación de remitos se corrigieron dos bugs reales
-  encontrados al probar contra Postgres (ver `docs/05-ux-api-testing-plan.md`):
-  un adjunto se guardaba siempre con extensión `.pdf` sin importar el tipo
-  real del archivo, y una entidad relacionada inexistente (cliente/producto/
-  proveedor) devolvía `500` en vez de un error `400`/`404` claro — este
-  segundo patrón se corrigió en los cuatro lugares donde aparecía.
+- La liquidación elige automáticamente el proveedor de mejor costo; el
+  resto de los candidatos queda visible para comparar, pero todavía no hay
+  una UI para elegir manualmente otro proveedor por ítem.
+- Varios bugs reales se encontraron y corrigieron probando contra Postgres
+  real (ver el historial de commits): un adjunto de remito se guardaba
+  siempre con extensión `.pdf` sin importar el archivo real subido, una
+  celda de Excel con hipervínculo anidado se guardaba como `"[object
+  Object]"`, y una entidad relacionada inexistente (cliente/producto/
+  proveedor) devolvía `500` en vez de un error `400`/`404` claro.
 
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): Pagos (Fase 5), y el resto del plan.
+`docs/05-ux-api-testing-plan.md §5`): auditoría/dashboard/buscador global
+(Fase 6), reportes y exportaciones (Fase 7), y hardening de producción
+(Fase 8: backups, seguridad, performance a escala, S3/MinIO real).
 
 ## Cómo levantar el entorno de desarrollo
 

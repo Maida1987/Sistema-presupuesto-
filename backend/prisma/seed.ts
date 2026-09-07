@@ -16,6 +16,7 @@ const PERMISSIONS = [
   { code: 'delivery-notes.write', description: 'Emitir/anular remitos' },
   { code: 'settlements.read', description: 'Consultar liquidaciones' },
   { code: 'settlements.write', description: 'Generar/confirmar/anular liquidaciones' },
+  { code: 'payments.read', description: 'Consultar pagos' },
   { code: 'payments.write', description: 'Registrar/anular pagos' },
   { code: 'audit.read', description: 'Consultar auditoría del sistema' },
   { code: 'users.manage', description: 'Administrar usuarios y roles' },
@@ -34,6 +35,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'delivery-notes.read',
     'settlements.read',
     'settlements.write',
+    'payments.read',
     'payments.write',
   ],
 };
