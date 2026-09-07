@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+type PrismaClientOrTx = PrismaService | Prisma.TransactionClient;
 
 /**
  * Numeración transaccional segura de documentos (remitos, liquidaciones,
@@ -13,28 +16,50 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export class DocumentCountersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getNextNumber(docType: string, series: string, year = new Date().getFullYear()): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        INSERT INTO document_counters (id, doc_type, series, year, last_number)
-        VALUES (${randomUUID()}, ${docType}, ${series}, ${year}, 0)
-        ON CONFLICT (doc_type, series, year) DO NOTHING
-      `;
+  /**
+   * Si se pasa `tx` (una transacción ya abierta por el llamador, p. ej. la
+   * que crea el remito), el número se reserva dentro de esa misma
+   * transacción — reservar el número y crear el documento son una única
+   * operación atómica (docs/02 §4/§5). Sin `tx`, abre su propia
+   * transacción (uso standalone).
+   */
+  async getNextNumber(
+    docType: string,
+    series: string,
+    year = new Date().getFullYear(),
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    if (tx) {
+      return this.reserveNumber(tx, docType, series, year);
+    }
+    return this.prisma.$transaction((innerTx) => this.reserveNumber(innerTx, docType, series, year));
+  }
 
-      const rows = await tx.$queryRaw<{ id: string; last_number: number }[]>`
-        SELECT id, last_number FROM document_counters
-        WHERE doc_type = ${docType} AND series = ${series} AND year = ${year}
-        FOR UPDATE
-      `;
+  private async reserveNumber(
+    client: PrismaClientOrTx,
+    docType: string,
+    series: string,
+    year: number,
+  ): Promise<number> {
+    await client.$executeRaw`
+      INSERT INTO document_counters (id, doc_type, series, year, last_number)
+      VALUES (${randomUUID()}, ${docType}, ${series}, ${year}, 0)
+      ON CONFLICT (doc_type, series, year) DO NOTHING
+    `;
 
-      const counter = rows[0];
-      const nextNumber = counter.last_number + 1;
+    const rows = await client.$queryRaw<{ id: string; last_number: number }[]>`
+      SELECT id, last_number FROM document_counters
+      WHERE doc_type = ${docType} AND series = ${series} AND year = ${year}
+      FOR UPDATE
+    `;
 
-      await tx.$executeRaw`
-        UPDATE document_counters SET last_number = ${nextNumber} WHERE id = ${counter.id}
-      `;
+    const counter = rows[0];
+    const nextNumber = counter.last_number + 1;
 
-      return nextNumber;
-    });
+    await client.$executeRaw`
+      UPDATE document_counters SET last_number = ${nextNumber} WHERE id = ${counter.id}
+    `;
+
+    return nextNumber;
   }
 }

@@ -72,7 +72,10 @@ export class ProductSupplierReferencesService {
 
   async match(id: string, dto: MatchSupplierReferenceDto, actingUserId: string): Promise<ProductSupplierReference> {
     const reference = await this.findOneOrThrow(id);
-    await this.prisma.product.findUniqueOrThrow({ where: { id: dto.productId } });
+    const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
+    if (!product) {
+      throw new NotFoundException('El producto indicado no existe');
+    }
 
     const updated = await this.prisma.productSupplierReference.update({
       where: { id },

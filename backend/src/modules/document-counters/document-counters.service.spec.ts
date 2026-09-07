@@ -34,4 +34,20 @@ describe('DocumentCountersService', () => {
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
   });
+
+  it('reserva el número dentro de una transacción externa (reservar + crear el documento como una sola operación atómica)', async () => {
+    const fakeTx = {
+      $executeRaw: jest.fn(async () => undefined),
+      $queryRaw: jest.fn(async () => [{ id: 'counter-1', last_number: 5 }]),
+    };
+
+    const prisma = { $transaction: jest.fn() } as unknown as PrismaService;
+    const service = new DocumentCountersService(prisma);
+
+    const number = await service.getNextNumber('REMITO', 'A', 2026, fakeTx as never);
+
+    expect(number).toBe(6);
+    // No abre una transacción propia: usa la que le pasó el llamador.
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
 });

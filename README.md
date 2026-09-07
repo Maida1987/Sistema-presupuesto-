@@ -11,8 +11,8 @@ repuestos para camiones, cuyo modelo comercial central es:
 
 ## Estado del proyecto
 
-**Fases 0 (infraestructura + auth/RBAC), 1 (catálogo base) y 2 (importación
-y precios) completas.**
+**Fases 0 (infraestructura + auth/RBAC), 1 (catálogo base), 2 (importación
+y precios) y 3 (remitos) completas.**
 
 El repositorio contiene el análisis funcional, la arquitectura, el modelo de
 datos, el diseño del motor de precios/importación de Excel, las pantallas
@@ -31,30 +31,42 @@ principales, la API, la estrategia de auditoría/testing y el plan de fases
   motor de precios versionado (`pricing_rules`/`price_history`) con
   trazabilidad completa. Todo con tests unitarios, incluyendo una suite de
   integración contra un Excel real de proveedor con 4 hojas heterogéneas
-  (`backend/test/fixtures/mercosil-listas-precios.xlsx`).
+  (`backend/test/fixtures/mercosil-listas-precios.xlsx`). También emisión
+  de remitos con numeración transaccional (reservar el número y
+  crear el remito son una única transacción atómica), máquina de estados
+  completa (EMITIDO → ENTREGADO → FIRMADO, con ANULADO desde cualquiera de
+  esos estados salvo LIQUIDADO), generación de PDF **sin precios en ningún
+  campo** (original y duplicado, con `pdf-lib`), y adjunto del remito
+  firmado (PDF/JPG/PNG) con auditoría e historial de transiciones.
 - Frontend (`frontend/`): React + Vite + Tailwind + TanStack Query. Login,
   ruta protegida, dashboard, pantallas de Clientes/Proveedores/Productos
   (con comparador de precios entre proveedores), wizard de importación de
-  listas (analizar → previsualizar → confirmar) y administración de reglas
-  de precios.
+  listas (analizar → previsualizar → confirmar), administración de reglas
+  de precios, y el flujo de remitos (alta rápida por cliente + búsqueda de
+  producto, detalle con PDF/adjuntar firma/anular, listado).
 
-**Limitaciones conocidas de la Fase 2** (documentadas, no bloquean el resto
-del plan):
+**Limitaciones conocidas** (documentadas, no bloquean el resto del plan):
 - El cálculo de `price_history` solo corre para listas en ARS; para listas
   en USD queda pendiente la conversión de moneda (ver pregunta abierta de
   tipo de cambio en `docs/01-analisis-funcional.md §8`) — el precio de lista
   igual se importa y queda trazable.
-- El archivo original se guarda en disco local (`backend/uploads/`, ver
-  `FileStorageService`), no todavía en S3/MinIO como propone la
-  arquitectura para producción — la interfaz ya está pensada para ese
-  reemplazo sin tocar los servicios que la usan.
-- La importación es síncrona (sin cola/BullMQ); funciona bien para los
-  volúmenes probados (cientos de filas) pero no está pensada aún para
+- El archivo original (listas de precios y remitos firmados) se guarda en
+  disco local (`backend/uploads/`, ver `FileStorageService`), no todavía en
+  S3/MinIO como propone la arquitectura para producción — la interfaz ya
+  está pensada para ese reemplazo sin tocar los servicios que la usan.
+- La importación de Excel es síncrona (sin cola/BullMQ); funciona bien para
+  los volúmenes probados (cientos de filas) pero no está pensada aún para
   archivos de cientos de miles de filas.
+- Durante la implementación de remitos se corrigieron dos bugs reales
+  encontrados al probar contra Postgres (ver `docs/05-ux-api-testing-plan.md`):
+  un adjunto se guardaba siempre con extensión `.pdf` sin importar el tipo
+  real del archivo, y una entidad relacionada inexistente (cliente/producto/
+  proveedor) devolvía `500` en vez de un error `400`/`404` claro — este
+  segundo patrón se corrigió en los cuatro lugares donde aparecía.
 
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): Remitos (Fase 3), Cuenta
-corriente/Liquidación (Fase 4), Pagos (Fase 5), y el resto del plan.
+`docs/05-ux-api-testing-plan.md §5`): Cuenta corriente/Liquidación (Fase 4),
+Pagos (Fase 5), y el resto del plan.
 
 ## Cómo levantar el entorno de desarrollo
 

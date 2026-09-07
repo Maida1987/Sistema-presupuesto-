@@ -255,6 +255,22 @@ anularse la liquidación que lo incluye (lo que lo devuelve a `FIRMADO`/
 `ENTREGADO`), y recién ahí puede anularse el remito. Esto evita romper la
 trazabilidad de una liquidación ya confirmada.
 
+> **Estado: implementado (Fase 3)**, en
+> `backend/src/modules/delivery-notes/`. Simplificaciones respecto de este
+> diseño: no se modela el paso `BORRADOR` (el remito nace directamente en
+> `EMITIDO`, ver justificación en `DeliveryNotesService`); adjuntar el
+> remito firmado desde `EMITIDO` registra automáticamente el paso por
+> `ENTREGADO` en el mismo movimiento (ambas transiciones quedan igual de
+> auditadas en `delivery_note_status_history`); y los PDF `ORIGINAL`/
+> `DUPLICADO` se generan on-demand con `pdf-lib` en vez de persistirse como
+> `delivery_note_documents` (son derivables determinísticamente de los
+> `code_snapshot`/`description_snapshot` ya congelados, así que no hace
+> falta guardarlos — solo el `FIRMADO_SCAN`, que sí es un archivo externo,
+> se persiste). Motor de numeración transaccional (`document_counters`)
+> extendido para poder compartir la transacción con el llamador (ver
+> `DocumentCountersService.getNextNumber`), de forma que reservar el
+> número y crear el remito sean una única operación atómica.
+
 ### Liquidación
 ```mermaid
 stateDiagram-v2

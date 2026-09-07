@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/interceptors/audit.service';
@@ -24,7 +24,7 @@ export class PriceListsService {
   ) {}
 
   async preview(buffer: Buffer, supplierId: string): Promise<PreviewResult> {
-    await this.prisma.supplier.findUniqueOrThrow({ where: { id: supplierId } });
+    await this.assertSupplierExists(supplierId);
 
     const savedMapping = await this.prisma.importMapping.findUnique({ where: { supplierId } });
     const parsedSheets = await parseWorkbook(buffer);
@@ -81,7 +81,7 @@ export class PriceListsService {
     sheetInputs: ConfirmSheetInput[],
     actingUserId: string,
   ): Promise<ImportReport> {
-    await this.prisma.supplier.findUniqueOrThrow({ where: { id: supplierId } });
+    await this.assertSupplierExists(supplierId);
     if (sheetInputs.length === 0) {
       throw new BadRequestException('No se seleccionó ninguna hoja para importar');
     }
@@ -279,6 +279,13 @@ export class PriceListsService {
         effectiveFrom: now,
       },
     });
+  }
+
+  private async assertSupplierExists(supplierId: string): Promise<void> {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    if (!supplier) {
+      throw new NotFoundException('El proveedor indicado no existe');
+    }
   }
 
   private async getPreviousPrices(supplierId: string, codes: string[]): Promise<Map<string, number>> {
