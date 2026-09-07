@@ -12,7 +12,7 @@ repuestos para camiones, cuyo modelo comercial central es:
 ## Estado del proyecto
 
 **Fases 0 (infraestructura + auth/RBAC), 1 (catálogo base), 2 (importación
-y precios) y 3 (remitos) completas.**
+y precios), 3 (remitos) y 4 (cuenta corriente y liquidación) completas.**
 
 El repositorio contiene el análisis funcional, la arquitectura, el modelo de
 datos, el diseño del motor de precios/importación de Excel, las pantallas
@@ -37,13 +37,29 @@ principales, la API, la estrategia de auditoría/testing y el plan de fases
   completa (EMITIDO → ENTREGADO → FIRMADO, con ANULADO desde cualquiera de
   esos estados salvo LIQUIDADO), generación de PDF **sin precios en ningún
   campo** (original y duplicado, con `pdf-lib`), y adjunto del remito
-  firmado (PDF/JPG/PNG) con auditoría e historial de transiciones.
+  firmado (PDF/JPG/PNG) con auditoría e historial de transiciones. Y el
+  módulo de cuenta corriente/liquidación (`modules/accounts/`): detecta
+  remitos firmados pendientes por cliente, resuelve el precio vigente de
+  cada ítem contra todos los proveedores que lo tienen (mostrando el
+  origen completo — proveedor, lista, margen/gastos/IVA — para que se
+  pueda reconstruir de dónde salió cada precio), genera la liquidación
+  como borrador reservando esos ítems (evita que dos liquidaciones
+  concurrentes tomen el mismo remito), y al confirmarla impacta la cuenta
+  corriente con un movimiento transaccional (`AccountMovementsService`,
+  con bloqueo de fila del cliente para que el saldo sea correcto incluso
+  con liquidaciones concurrentes — verificado con dos confirmaciones en
+  paralelo reales) y marca los remitos como `LIQUIDADO`. Anular una
+  liquidación revierte todo: libera los remitos, los devuelve a `FIRMADO`
+  y genera el movimiento de ajuste contrario, nunca borra nada.
 - Frontend (`frontend/`): React + Vite + Tailwind + TanStack Query. Login,
   ruta protegida, dashboard, pantallas de Clientes/Proveedores/Productos
   (con comparador de precios entre proveedores), wizard de importación de
   listas (analizar → previsualizar → confirmar), administración de reglas
-  de precios, y el flujo de remitos (alta rápida por cliente + búsqueda de
-  producto, detalle con PDF/adjuntar firma/anular, listado).
+  de precios, el flujo de remitos (alta rápida por cliente + búsqueda de
+  producto, detalle con PDF/adjuntar firma/anular, listado), y cuenta
+  corriente/liquidación (vista de cuenta con saldo y movimientos, wizard de
+  liquidación con la transparencia de precio completa por ítem, detalle de
+  liquidación con desglose y anulación).
 
 **Limitaciones conocidas** (documentadas, no bloquean el resto del plan):
 - El cálculo de `price_history` solo corre para listas en ARS; para listas
@@ -65,8 +81,7 @@ principales, la API, la estrategia de auditoría/testing y el plan de fases
   segundo patrón se corrigió en los cuatro lugares donde aparecía.
 
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): Cuenta corriente/Liquidación (Fase 4),
-Pagos (Fase 5), y el resto del plan.
+`docs/05-ux-api-testing-plan.md §5`): Pagos (Fase 5), y el resto del plan.
 
 ## Cómo levantar el entorno de desarrollo
 

@@ -6,6 +6,10 @@ export function fetchCustomers(search: string): Promise<Customer[]> {
   return apiFetch<Customer[]>(`/customers${query}`);
 }
 
+export function fetchCustomer(id: string): Promise<Customer> {
+  return apiFetch<Customer>(`/customers/${id}`);
+}
+
 export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
   return apiFetch<Customer>('/customers', { method: 'POST', body: JSON.stringify(input) });
 }

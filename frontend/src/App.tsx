@@ -10,6 +10,9 @@ import { PricingRulesPage } from './features/pricing-rules/PricingRulesPage';
 import { DeliveryNotesListPage } from './features/delivery-notes/DeliveryNotesListPage';
 import { NewDeliveryNotePage } from './features/delivery-notes/NewDeliveryNotePage';
 import { DeliveryNoteDetailPage } from './features/delivery-notes/DeliveryNoteDetailPage';
+import { CustomerAccountPage } from './features/accounts/CustomerAccountPage';
+import { NewSettlementPage } from './features/accounts/NewSettlementPage';
+import { SettlementDetailPage } from './features/accounts/SettlementDetailPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -104,6 +107,36 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <PricingRulesPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clientes/:id/cuenta"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <CustomerAccountPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clientes/:id/liquidar"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <NewSettlementPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/liquidaciones/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <SettlementDetailPage />
               </AppShell>
             </ProtectedRoute>
           }

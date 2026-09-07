@@ -284,6 +284,22 @@ stateDiagram-v2
 `LIQUIDADO`. `ANULADA` genera un movimiento de reverso (nunca borra el
 original) y devuelve los remitos afectados a su estado previo.
 
+> **Estado: implementado (Fase 4)**, en `backend/src/modules/accounts/`.
+> El precio de cada ítem se resuelve al momento de **crear** el borrador
+> (no al confirmarlo) contra `price_history`, eligiendo por defecto el de
+> mejor costo entre todos los proveedores vigentes para ese producto
+> (`resolvePriceCandidates`); el resto de los candidatos queda igual
+> disponible en `price_breakdown.alternativeCandidates` para el
+> comparador, aunque la selección automática del mejor costo — sin una UI
+> para elegir manualmente otro proveedor — es una simplificación de esta
+> fase. Ya en el borrador se fija `delivery_note_items.settlement_item_id`
+> (no recién al confirmar), para que dos liquidaciones concurrentes nunca
+> puedan tomar el mismo remito; si el borrador se anula, se libera. El
+> saldo de `account_movements` se calcula con un bloqueo de fila del
+> cliente (`SELECT ... FOR UPDATE` sobre `customers`) dentro de la misma
+> transacción que crea el movimiento, verificado con dos confirmaciones de
+> liquidación concurrentes reales sin pérdida de actualización.
+
 ### Pago
 ```mermaid
 stateDiagram-v2

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { createCustomer, fetchCustomers } from './api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -88,19 +89,20 @@ export function CustomersPage() {
               <th className="px-4 py-2">CUIT</th>
               <th className="px-4 py-2">Localidad</th>
               <th className="px-4 py-2">Estado</th>
+              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   Cargando…
                 </td>
               </tr>
             )}
             {!isLoading && customers?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   Sin clientes para mostrar.
                 </td>
               </tr>
@@ -121,6 +123,11 @@ export function CustomersPage() {
                   >
                     {customer.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
                   </span>
+                </td>
+                <td className="px-4 py-2">
+                  <Link to={`/clientes/${customer.id}/cuenta`} className="text-xs text-slate-500 underline hover:text-slate-900">
+                    Ver cuenta
+                  </Link>
                 </td>
               </tr>
             ))}
