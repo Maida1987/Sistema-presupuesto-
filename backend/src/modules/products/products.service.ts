@@ -54,6 +54,61 @@ export class ProductsService {
     return rows.map(mapRawProductRow);
   }
 
+  /**
+   * Comparador de precios entre proveedores para un producto (docs/04
+   * §6.3): último precio de cada referencia de proveedor vinculada, con
+   * la variación % respecto de la lista anterior del mismo proveedor y el
+   * "mejor costo" resaltado. Nota: no convierte moneda (ver pregunta
+   * abierta de tipo de cambio en docs/01 §8) — el precio y su moneda se
+   * muestran siempre juntos para no comparar ARS contra USD como si
+   * fueran lo mismo.
+   */
+  async comparePrices(productId: string): Promise<{
+    productId: string;
+    bestSupplierId: string | null;
+    comparisons: Array<{
+      supplierId: string;
+      supplierName: string;
+      supplierCode: string;
+      price: number;
+      currency: string;
+      effectiveDate: Date;
+      previousPrice: number | null;
+      percentChange: number | null;
+    }>;
+  }> {
+    await this.findOne(productId);
+
+    const references = await this.prisma.productSupplierReference.findMany({
+      where: { productId, matchStatus: 'MATCHED' },
+      include: {
+        supplier: true,
+        priceListItems: { orderBy: { createdAt: 'desc' }, take: 2, include: { priceList: true } },
+      },
+    });
+
+    const comparisons = references
+      .filter((reference) => reference.priceListItems.length > 0)
+      .map((reference) => {
+        const [latest, previous] = reference.priceListItems;
+        const price = Number(latest.price);
+        const previousPrice = previous ? Number(previous.price) : null;
+        return {
+          supplierId: reference.supplierId,
+          supplierName: reference.supplier.name,
+          supplierCode: reference.supplierCode,
+          price,
+          currency: latest.currency,
+          effectiveDate: latest.priceList.effectiveDate,
+          previousPrice,
+          percentChange: previousPrice ? (price - previousPrice) / previousPrice : null,
+        };
+      })
+      .sort((a, b) => a.price - b.price);
+
+    return { productId, bestSupplierId: comparisons[0]?.supplierId ?? null, comparisons };
+  }
+
   async findOne(id: string): Promise<Product> {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) {

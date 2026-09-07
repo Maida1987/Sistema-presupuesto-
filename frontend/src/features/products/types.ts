@@ -15,3 +15,20 @@ export interface CreateProductInput {
   unit?: string;
   truckApplication?: string;
 }
+
+export interface PriceComparisonEntry {
+  supplierId: string;
+  supplierName: string;
+  supplierCode: string;
+  price: number;
+  currency: string;
+  effectiveDate: string;
+  previousPrice: number | null;
+  percentChange: number | null;
+}
+
+export interface PriceComparison {
+  productId: string;
+  bestSupplierId: string | null;
+  comparisons: PriceComparisonEntry[];
+}

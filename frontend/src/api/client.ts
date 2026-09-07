@@ -65,3 +65,31 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
+
+/**
+ * Igual que apiFetch pero para multipart/form-data (subida de archivos):
+ * nunca fuerza Content-Type, el navegador arma el boundary solo.
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const doFetch = async (token: string | null) => {
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    return fetch(`/api${path}`, { method: 'POST', headers, body: formData });
+  };
+
+  let response = await doFetch(getAccessToken());
+
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await doFetch(newToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(typeof body.message === 'string' ? body.message : 'Error inesperado');
+  }
+
+  return response.json() as Promise<T>;
+}

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createProduct, searchProducts } from './api';
+import { PriceComparisonPanel } from './PriceComparisonPanel';
 import { useAuth } from '../auth/AuthContext';
 
 export function ProductsPage() {
@@ -9,6 +10,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', search],
@@ -86,41 +88,59 @@ export function ProductsPage() {
               <th className="px-4 py-2">Marca</th>
               <th className="px-4 py-2">Aplicación</th>
               <th className="px-4 py-2">Estado</th>
+              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   Cargando…
                 </td>
               </tr>
             )}
             {!isLoading && products?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                   Sin productos para mostrar.
                 </td>
               </tr>
             )}
             {products?.map((product) => (
-              <tr key={product.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2 font-mono text-xs text-slate-500">{product.internalCode}</td>
-                <td className="px-4 py-2">{product.description}</td>
-                <td className="px-4 py-2">{product.brand ?? '—'}</td>
-                <td className="px-4 py-2">{product.truckApplication ?? '—'}</td>
-                <td className="px-4 py-2">
-                  <span
-                    className={
-                      product.status === 'ACTIVE'
-                        ? 'rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700'
-                        : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500'
-                    }
-                  >
-                    {product.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-              </tr>
+              <Fragment key={product.id}>
+                <tr className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-2 font-mono text-xs text-slate-500">{product.internalCode}</td>
+                  <td className="px-4 py-2">{product.description}</td>
+                  <td className="px-4 py-2">{product.brand ?? '—'}</td>
+                  <td className="px-4 py-2">{product.truckApplication ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={
+                        product.status === 'ACTIVE'
+                          ? 'rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700'
+                          : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500'
+                      }
+                    >
+                      {product.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <button
+                      onClick={() => setExpandedProductId((current) => (current === product.id ? null : product.id))}
+                      className="text-xs text-slate-500 underline hover:text-slate-900"
+                    >
+                      {expandedProductId === product.id ? 'Ocultar precios' : 'Ver precios'}
+                    </button>
+                  </td>
+                </tr>
+                {expandedProductId === product.id && (
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td colSpan={6}>
+                      <PriceComparisonPanel productId={product.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

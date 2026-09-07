@@ -25,6 +25,12 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
 
+  @Get(':id/prices')
+  @RequirePermissions('products.read')
+  comparePrices(@Param('id') id: string) {
+    return this.productsService.comparePrices(id);
+  }
+
   @Post()
   @RequirePermissions('products.write')
   create(@Body() dto: CreateProductDto, @CurrentUser() user: AuthenticatedUser) {

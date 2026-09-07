@@ -1,5 +1,23 @@
 # 04 — Importación inteligente de Excel y motor de precios
 
+> **Estado: implementado (Fase 2).** El diseño descrito en este documento
+> está construido en `backend/src/modules/price-lists/` (parsing, control
+> de calidad, orquestación) y `backend/src/modules/pricing-rules/` (motor
+> de precios), validado con tests unitarios y con una suite de integración
+> contra el archivo real de MERCOSIL usado como caso de estudio
+> (`backend/test/fixtures/mercosil-listas-precios.xlsx`,
+> `backend/src/modules/price-lists/parsing/mercosil-fixture.spec.ts`). El
+> wizard de importación y la pantalla de reglas de precios están en
+> `frontend/src/features/price-lists/` y `frontend/src/features/pricing-rules/`.
+> Durante la implementación se corrigió un bug real encontrado con el
+> archivo de MERCOSIL: una celda de descripción con hipervínculo cuyo
+> texto era, a su vez, texto enriquecido anidado, se guardaba literalmente
+> como `"[object Object]"` — ver `workbook-parser.ts` y su test de
+> regresión. Limitaciones conocidas: el cálculo de `price_history` no
+> convierte moneda todavía (solo corre para listas en ARS, ver
+> `01-analisis-funcional.md §8`), y el archivo original se guarda en disco
+> local en vez de S3/MinIO (ver `02-arquitectura.md`).
+
 ## 1. Flujo de importación (experiencia de usuario)
 
 ```mermaid

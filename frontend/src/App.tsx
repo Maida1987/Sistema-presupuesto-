@@ -5,6 +5,8 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { CustomersPage } from './features/customers/CustomersPage';
 import { SuppliersPage } from './features/suppliers/SuppliersPage';
 import { ProductsPage } from './features/products/ProductsPage';
+import { ImportListPage } from './features/price-lists/ImportListPage';
+import { PricingRulesPage } from './features/pricing-rules/PricingRulesPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -49,6 +51,26 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <ProductsPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/importar-lista"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ImportListPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reglas-de-precios"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <PricingRulesPage />
               </AppShell>
             </ProtectedRoute>
           }
