@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/remitos', label: 'Remitos' },
   { to: '/importar-lista', label: 'Importar lista' },
   { to: '/reglas-de-precios', label: 'Reglas de precios' },
+  { to: '/reportes', label: 'Reportes' },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -16,6 +16,7 @@ import { NewSettlementPage } from './features/accounts/NewSettlementPage';
 import { SettlementDetailPage } from './features/accounts/SettlementDetailPage';
 import { PaymentDetailPage } from './features/payments/PaymentDetailPage';
 import { AuditLogPage } from './features/audit/AuditLogPage';
+import { ReportsPage } from './features/reports/ReportsPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -170,6 +171,16 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <AuditLogPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reportes"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ReportsPage />
               </AppShell>
             </ProtectedRoute>
           }

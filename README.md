@@ -11,10 +11,10 @@ repuestos para camiones, cuyo modelo comercial central es:
 
 ## Estado del proyecto
 
-**El flujo de negocio central está completo: Fases 0 a 6 del plan
+**El flujo de negocio central está completo: Fases 0 a 7 del plan
 implementadas** (infraestructura/auth, catálogo, importación de precios,
 remitos, cuenta corriente/liquidación, pagos, auditoría consultable +
-dashboard + buscador global). El ciclo completo
+dashboard + buscador global, reportes y exportaciones). El ciclo completo
 `cliente → remito → firma → liquidación → pago` funciona de punta a punta,
 validado contra PostgreSQL real y en el navegador.
 
@@ -31,9 +31,10 @@ validado contra PostgreSQL real y en el navegador.
 | Pagos | `payments/` — registro/anulación, reutiliza el mismo libro de movimientos que Liquidación | `payments/` |
 | Dashboard | `dashboard/` — indicadores (saldo total, cuentas activas, remitos por liquidar) y alertas (listas desactualizadas, productos sin precio, remitos sin firmar, clientes con saldo elevado, variaciones de precio significativas) calculados sobre datos reales | `dashboard/` |
 | Buscador global | `search/` — búsqueda combinada en clientes, proveedores, productos y remitos | `search/` — `GlobalSearch` en el header, con debounce |
+| Reportes y exportaciones | `reports/` — clientes/productos/remitos en Excel/CSV (`exceljs`), extracto de cuenta corriente en PDF paginado (`pdf-lib`, nunca trunca) además de Excel/CSV | `reports/` — `ReportsPage` con filtros y descarga real (no solo vista inline) |
 | Numeración segura | `document-counters/` — `SELECT ... FOR UPDATE`, reutilizable dentro de una transacción del llamador | — |
 
-68 tests unitarios (incluyendo una suite de integración contra un Excel
+85 tests unitarios (incluyendo una suite de integración contra un Excel
 real de proveedor con 4 hojas heterogéneas,
 `backend/test/fixtures/mercosil-listas-precios.xlsx`), todos en verde.
 Detalle completo de cada fase en `docs/05-ux-api-testing-plan.md §5` y en
@@ -102,10 +103,15 @@ las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
   por sección); funciona bien con el volumen de datos actual pero conviene
   revisitarlo en la Fase 8 (hardening/performance) si el catálogo crece
   mucho.
+- Los reportes de clientes/productos/remitos no tienen límite de filas
+  (a diferencia de las pantallas normales, que sí paginan/cortan) — es
+  intencional para que una exportación no quede incompleta en silencio,
+  pero si el catálogo/histórico de remitos crece mucho convendría agregar
+  un filtro de período obligatorio en clientes/productos también (remitos
+  ya lo tiene opcional).
 
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): reportes y exportaciones (Fase 7), y
-hardening de producción (Fase 8: backups, seguridad, performance a escala,
+`docs/05-ux-api-testing-plan.md §5`): hardening de producción (Fase 8: backups, seguridad, performance a escala,
 S3/MinIO real).
 
 ## Cómo levantar el entorno de desarrollo
