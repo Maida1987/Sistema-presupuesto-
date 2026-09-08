@@ -48,15 +48,22 @@ las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
   local (`backend/uploads/`, ver `FileStorageService`), no todavía en
   S3/MinIO como propone la arquitectura para producción — la interfaz ya
   está pensada para ese reemplazo sin tocar los servicios que la usan.
-- La importación de Excel es síncrona (sin cola/BullMQ) y bloquea el único
-  proceso Node mientras procesa: funciona bien para los volúmenes probados
-  de cientos de filas, pero ya es notoria con miles — medido contra un
-  archivo real de 30.066 filas (`PreciosBULON.xlsx`), la previsualización
-  tarda ~70s y la confirmación (que además escribe en base) ~3 min,
-  período en el que el servidor no atiende otras requests. Antes de
-  soportar archivos de decenas/cientos de miles de filas de forma
-  confiable hace falta mover el procesamiento a un worker asincrónico
-  (Fase 8).
+- La importación de Excel sigue siendo síncrona (sin cola/BullMQ), pero ya
+  no es el cuello de botella que era: se encontraron y corrigieron dos
+  bugs reales de performance probando contra el archivo real de 30.066
+  filas (`PreciosBULON.xlsx`) — (1) `exceljs` expone `worksheet.
+  columnCount` como un getter que recorre toda la hoja en cada llamada (no
+  un campo cacheado); se estaba llamando una vez por fila adentro del
+  parseo, haciéndolo O(filas²), y (2) `importSheet` hacía 2-3 round-trips
+  a la base **por fila** (findUnique + create + create), unos 90.000 para
+  ese archivo. Con ambos corregidos (columnCount cacheado una sola vez por
+  hoja + `createMany` en lote), el mismo archivo pasó de ~70s de
+  previsualización / ~3 min de confirmación — bloqueando el único proceso
+  Node todo ese tiempo — a **~2s / ~6s**, con el servidor respondiendo con
+  normalidad a otras requests durante el import. No hay evidencia todavía
+  de que haga falta un worker asincrónico para los volúmenes reales
+  vistos hasta ahora; si algún proveedor trae listas de cientos de miles
+  de filas convendría medir de nuevo antes de asumirlo.
 - El *matching* de una referencia de proveedor recién importada con el
   catálogo maestro de productos es un paso manual/separado (`products.
   match`): importar una lista deja las referencias en `UNMATCHED` y

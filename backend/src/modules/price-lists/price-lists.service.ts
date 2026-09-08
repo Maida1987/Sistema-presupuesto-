@@ -172,41 +172,73 @@ export class PriceListsService {
           });
         }
 
-        let newReferences = 0;
-        let imported = 0;
+        // Antes esto era un findUnique + (a veces) create + create por cada
+        // fila, adentro de esta misma transacción: 2-3 round-trips a la
+        // base por ítem. Con un archivo real de 30.066 filas (PreciosBULON)
+        // eso son ~90.000 round-trips secuenciales y ~3 minutos bloqueando
+        // la conexión. Se reemplaza por un puñado de consultas en lote,
+        // sin importar cuántas filas tenga el archivo.
+        const validCodes = quality.validItems.map((item) => item.code);
 
-        for (const item of quality.validItems) {
-          let reference = await tx.productSupplierReference.findUnique({
-            where: { supplierId_supplierCode: { supplierId, supplierCode: item.code } },
-          });
+        const refSelect = { id: true, supplierCode: true, matchStatus: true, productId: true } as const;
+        const existingRefs = await tx.productSupplierReference.findMany({
+          where: { supplierId, supplierCode: { in: validCodes } },
+          select: refSelect,
+        });
+        const refByCode = new Map(existingRefs.map((ref) => [ref.supplierCode, ref]));
 
-          if (!reference) {
-            reference = await tx.productSupplierReference.create({
-              data: { supplierId, supplierCode: item.code, supplierDescription: item.description },
-            });
-            newReferences += 1;
-          }
-
-          const priceListItem = await tx.priceListItem.create({
-            data: {
-              priceListId: priceList.id,
-              supplierReferenceId: reference.id,
-              price: item.price,
-              currency: input.currency,
-            },
-          });
-          imported += 1;
-
-          if (reference.matchStatus === 'MATCHED' && reference.productId) {
-            await this.recordPriceHistory(
-              tx,
+        const newItems = quality.validItems.filter((item) => !refByCode.has(item.code));
+        if (newItems.length > 0) {
+          await tx.productSupplierReference.createMany({
+            data: newItems.map((item) => ({
               supplierId,
-              reference.productId,
-              reference.id,
-              priceListItem.id,
-              item,
-              input.currency,
-            );
+              supplierCode: item.code,
+              supplierDescription: item.description,
+            })),
+            skipDuplicates: true,
+          });
+
+          const createdRefs = await tx.productSupplierReference.findMany({
+            where: { supplierId, supplierCode: { in: newItems.map((item) => item.code) } },
+            select: refSelect,
+          });
+          for (const ref of createdRefs) refByCode.set(ref.supplierCode, ref);
+        }
+        const newReferences = newItems.length;
+
+        await tx.priceListItem.createMany({
+          data: quality.validItems.map((item) => ({
+            priceListId: priceList.id,
+            supplierReferenceId: refByCode.get(item.code)!.id,
+            price: item.price,
+            currency: input.currency,
+          })),
+        });
+        const imported = quality.validItems.length;
+
+        // recordPriceHistory solo aplica a referencias ya matcheadas con un
+        // producto del catálogo maestro — en la práctica un subconjunto
+        // chico (recién importado, la mayoría queda UNMATCHED), así que
+        // dejarlo en un loop por ítem no es el cuello de botella.
+        const matchedItems = quality.validItems.filter((item) => {
+          const ref = refByCode.get(item.code)!;
+          return ref.matchStatus === 'MATCHED' && ref.productId;
+        });
+
+        if (matchedItems.length > 0) {
+          const matchedRefIds = matchedItems.map((item) => refByCode.get(item.code)!.id);
+          const createdPriceListItems = await tx.priceListItem.findMany({
+            where: { priceListId: priceList.id, supplierReferenceId: { in: matchedRefIds } },
+            select: { id: true, supplierReferenceId: true },
+          });
+          const priceListItemIdByRefId = new Map(
+            createdPriceListItems.map((pli) => [pli.supplierReferenceId, pli.id]),
+          );
+
+          for (const item of matchedItems) {
+            const ref = refByCode.get(item.code)!;
+            const priceListItemId = priceListItemIdByRefId.get(ref.id)!;
+            await this.recordPriceHistory(tx, supplierId, ref.productId!, ref.id, priceListItemId, item, input.currency);
           }
         }
 

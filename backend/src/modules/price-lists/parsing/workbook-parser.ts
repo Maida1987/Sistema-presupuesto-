@@ -79,11 +79,22 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParsedSheet[]> {
   return workbook.worksheets.map((worksheet) => {
     const rows: CellValue[][] = [];
 
+    // `worksheet.columnCount` es un getter de exceljs que internamente
+    // recorre TODA la hoja (`this.eachRow(...)`) para calcularlo — no es un
+    // campo cacheado. Bug real encontrado con el archivo PreciosBULON
+    // (30.066 filas): llamarlo adentro del eachRow de abajo, una vez por
+    // fila, lo convertía en O(filas²) y tardaba minutos. Se calcula una
+    // sola vez acá afuera. También se usa `row.values` (bulk) en vez de
+    // `row.getCell(col)` por columna, bastante más rápido para archivos
+    // grandes.
+    const sheetColumnCount = worksheet.columnCount;
+
     worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      const cells: CellValue[] = [];
-      const columnCount = Math.max(row.cellCount, worksheet.columnCount);
+      const values = row.values as ExcelJS.CellValue[];
+      const columnCount = Math.max(row.cellCount, sheetColumnCount);
+      const cells: CellValue[] = new Array(columnCount);
       for (let col = 1; col <= columnCount; col += 1) {
-        cells.push(normalizeCellValue(row.getCell(col).value));
+        cells[col - 1] = normalizeCellValue(values[col]);
       }
       rows[rowNumber - 1] = cells;
     });
