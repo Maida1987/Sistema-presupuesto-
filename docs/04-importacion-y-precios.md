@@ -129,6 +129,18 @@ y sigue" sin dejar rastro).
   encuentra tanto por su nombre maestro como por cualquier variante de
   proveedor.
 
+> **Estado: implementado**, en `backend/src/modules/products/
+> product-supplier-references.{service,controller}.ts` (sugerencia y
+> confirmación individual desde el inicio del proyecto; sugerencia y
+> confirmación **masiva**, más alta de producto nuevo desde una
+> referencia sin candidato, agregadas después de probar contra ~76.000
+> referencias reales sin vincular) y `frontend/src/features/products/
+> MatchingPage.tsx`. La sugerencia de candidatos usa únicamente similitud
+> de texto sobre la descripción — la "coincidencia de código alternativo"
+> mencionada arriba no está implementada (el maestro no tiene un campo de
+> códigos alternativos en el esquema actual); si en el futuro hace falta,
+> requiere antes definir dónde vivirían esos códigos.
+
 ## 6. Motor de precios y márgenes
 
 ### 6.1 Modelo de reglas (`pricing_rules`)

@@ -31,6 +31,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'suppliers.read',
     'suppliers.write',
     'products.read',
+    'products.write',
     'price-lists.import',
     'delivery-notes.read',
     'settlements.read',

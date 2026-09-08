@@ -23,7 +23,7 @@ validado contra PostgreSQL real y en el navegador.
 | Auth / RBAC | `auth/` — JWT access+refresh, permisos (`@RequirePermissions`) | login, ruta protegida |
 | Auditoría | `common/interceptors/audit.service.ts` (registro, invocado por cada servicio de dominio) + `audit/audit.controller.ts` (consulta, `GET /audit-logs` con filtros) | `audit/` — tabla con filtros por módulo/entidad |
 | Clientes / Proveedores | `customers/`, `suppliers/` — CRUD, búsqueda tolerante (`pg_trgm`) | `customers/`, `suppliers/` |
-| Productos | `products/` — maestro + referencias de proveedor, matching por similitud, comparador de precios | `products/` |
+| Productos | `products/` — maestro + referencias de proveedor, matching por similitud (individual y masivo), comparador de precios | `products/` — catálogo + `/productos/matching` (matching masivo) |
 | Importación de listas | `price-lists/` — detección de columnas (sinónimos o posicional), metadata, control de calidad, multi-hoja | `price-lists/` — wizard analizar→previsualizar→confirmar |
 | Motor de precios | `pricing-rules/` — reglas versionadas por scope, `price_history` | `pricing-rules/` |
 | Remitos | `delivery-notes/` — numeración transaccional, estados, PDF sin precios (`pdf-lib`), adjunto de firma | `delivery-notes/` |
@@ -65,12 +65,22 @@ las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
   vistos hasta ahora; si algún proveedor trae listas de cientos de miles
   de filas convendría medir de nuevo antes de asumirlo.
 - El *matching* de una referencia de proveedor recién importada con el
-  catálogo maestro de productos es un paso manual/separado (`products.
-  match`): importar una lista deja las referencias en `UNMATCHED` y
-  `price_history` no se calcula hasta que se matchean con un producto (es
-  el diseño documentado en `04-importacion-y-precios.md`, no un bug) — con
-  varios miles de referencias nuevas sin matchear, todavía no hay una
-  forma masiva/asistida de matchear en lote, solo de a una.
+  catálogo maestro de productos sigue siendo un paso manual (nunca
+  automático y silencioso, por diseño — ver `04-importacion-y-precios.md`
+  §5), pero ahora hay una pantalla de matching masivo
+  (`/productos/matching`, permiso `products.write`) en vez de tener que
+  hacerlo de a una: lista paginada de referencias `UNMATCHED`/`MATCHED`/
+  `IGNORED` con filtro por proveedor, sugerencia de producto candidato por
+  similitud de texto (`pg_trgm`, una sola consulta con `LATERAL JOIN` para
+  toda la página en vez de N consultas — mismo cuidado que en la
+  importación), selección automática solo de las sugerencias de alta
+  confianza (≥50% similitud, el usuario decide el resto), override manual
+  por referencia, alta de producto nuevo directamente desde una referencia
+  sin candidato razonable, y confirmar/ignorar en lote. Probado con los
+  76.680 `UNMATCHED` reales que dejaron las importaciones de esta fase.
+  Corregido de paso un bug de permisos real: el rol `Administración` (el
+  que importa las listas) no tenía `products.write` y no podía completar
+  el matching después de importar.
 - La liquidación elige automáticamente el proveedor de mejor costo; el
   resto de los candidatos queda visible para comparar, pero todavía no hay
   una UI para elegir manualmente otro proveedor por ítem.

@@ -17,7 +17,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout, hasPermission } = useAuth();
   const location = useLocation();
 
-  const navItems = hasPermission('audit.read') ? [...NAV_ITEMS, { to: '/auditoria', label: 'Auditoría' }] : NAV_ITEMS;
+  const navItems = [
+    ...NAV_ITEMS,
+    ...(hasPermission('products.write') ? [{ to: '/productos/matching', label: 'Matching' }] : []),
+    ...(hasPermission('audit.read') ? [{ to: '/auditoria', label: 'Auditoría' }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50">

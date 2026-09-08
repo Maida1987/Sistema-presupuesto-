@@ -5,6 +5,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { CustomersPage } from './features/customers/CustomersPage';
 import { SuppliersPage } from './features/suppliers/SuppliersPage';
 import { ProductsPage } from './features/products/ProductsPage';
+import { MatchingPage } from './features/products/MatchingPage';
 import { ImportListPage } from './features/price-lists/ImportListPage';
 import { PricingRulesPage } from './features/pricing-rules/PricingRulesPage';
 import { DeliveryNotesListPage } from './features/delivery-notes/DeliveryNotesListPage';
@@ -59,6 +60,16 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <ProductsPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/productos/matching"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MatchingPage />
               </AppShell>
             </ProtectedRoute>
           }

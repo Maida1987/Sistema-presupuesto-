@@ -36,6 +36,7 @@ export function DashboardPage() {
   const alertCount = data
     ? data.alerts.staleSupplierLists.length +
       (data.alerts.productsWithoutPrice > 0 ? 1 : 0) +
+      (data.alerts.unmatchedSupplierReferences > 0 ? 1 : 0) +
       (data.alerts.unsignedDeliveryNotes > 0 ? 1 : 0) +
       data.alerts.highBalanceCustomers.length
     : 0;
@@ -89,6 +90,13 @@ export function DashboardPage() {
                 ))}
                 {data.alerts.productsWithoutPrice > 0 && (
                   <li>{data.alerts.productsWithoutPrice} producto(s) vinculado(s) a un proveedor sin precio vigente</li>
+                )}
+                {data.alerts.unmatchedSupplierReferences > 0 && (
+                  <li>
+                    <Link to="/productos/matching" className="underline">
+                      {data.alerts.unmatchedSupplierReferences} referencia(s) de proveedor sin vincular a un producto
+                    </Link>
+                  </li>
                 )}
                 {data.alerts.unsignedDeliveryNotes > 0 && (
                   <li>
