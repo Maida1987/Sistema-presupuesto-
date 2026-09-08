@@ -2,6 +2,19 @@ import * as ExcelJS from 'exceljs';
 
 export type CellValue = string | number | null;
 
+/** Firma de un Compound File Binary (el contenedor de un .xls Excel 97-2003, no soportado). */
+const OLE2_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+
+export class UnsupportedLegacyXlsError extends Error {
+  constructor() {
+    super(
+      'Este archivo está en formato Excel 97-2003 (.xls binario), que no soportamos. ' +
+        'Abrilo en Excel y guardalo como .xlsx (Archivo > Guardar como > Libro de Excel), luego volvé a subirlo.',
+    );
+    this.name = 'UnsupportedLegacyXlsError';
+  }
+}
+
 export interface ParsedSheet {
   sheetName: string;
   /** Filas 0-indexadas, cada una con sus celdas 0-indexadas (columna A = índice 0). */
@@ -56,6 +69,10 @@ export function normalizeCellValue(value: ExcelJS.CellValue): CellValue {
  * metadata antes de la tabla de ítems.
  */
 export async function parseWorkbook(buffer: Buffer): Promise<ParsedSheet[]> {
+  if (buffer.subarray(0, 8).equals(OLE2_SIGNATURE)) {
+    throw new UnsupportedLegacyXlsError();
+  }
+
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
 

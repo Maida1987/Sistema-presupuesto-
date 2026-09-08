@@ -1,4 +1,4 @@
-import { normalizeCellValue } from './workbook-parser';
+import { normalizeCellValue, parseWorkbook, UnsupportedLegacyXlsError } from './workbook-parser';
 
 describe('normalizeCellValue', () => {
   it('devuelve strings y números tal cual', () => {
@@ -37,5 +37,17 @@ describe('normalizeCellValue', () => {
     const result = normalizeCellValue({ algoQueNoReconocemos: true } as never);
     expect(result).not.toBe('[object Object]');
     expect(result).toBeNull();
+  });
+});
+
+describe('parseWorkbook con un .xls binario (Excel 97-2003)', () => {
+  it('rechaza con un error claro en vez de dejar que exceljs falle con un mensaje interno de jszip (bug real con el archivo FGP)', async () => {
+    // Firma de Compound File Binary (OLE2), el contenedor real de un .xls
+    // legado — no hace falta un archivo real completo para probar la
+    // detección, que solo mira los primeros 8 bytes.
+    const oleBuffer = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]);
+
+    await expect(parseWorkbook(oleBuffer)).rejects.toThrow(UnsupportedLegacyXlsError);
+    await expect(parseWorkbook(oleBuffer)).rejects.toThrow(/\.xlsx/);
   });
 });

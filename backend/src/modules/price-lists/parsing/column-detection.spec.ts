@@ -84,4 +84,27 @@ describe('detectColumns', () => {
   it('no detecta nada sobre una hoja sin datos', () => {
     expect(detectColumns([[null, null], [null, null]])).toBeNull();
   });
+
+  it('elige "Importe final" y no "U. Precio" como columna de precio (bug real con el archivo PreciosBULON)', () => {
+    // "U. Precio" (unidad de referencia del precio, ej. "Unidad") matchea
+    // por distancia de Levenshtein contra el sinónimo "precio" antes que
+    // llegar a "Importe final" — pero sus datos son texto ("Unidad"), no
+    // precios. Sin la validación contra los datos, la hoja entera quedaba
+    // con 0 filas válidas.
+    const rows: (string | number | null)[][] = [
+      ['Codigo', 'Descripcion', 'Importe inicial', 'Moneda', 'Descuento %', 'Importe final', 'U. Precio', 'IVA'],
+      ['1.11.22', 'BULON PULIDO USS 7/16x 7/8', 221.35, 'Pesos', -50, 110.67, 'Unidad', 21],
+      ['1.11.70', 'BULON PULIDO USS 7/16x 2.3/4', 4225.76, 'Pesos', -50, 2112.88, 'Unidad', 21],
+      ['1.13.125', 'BULON PULIDO USS 1/2x 5', 869.3, 'Pesos', 0, 869.3, 'Unidad', 21],
+    ];
+
+    const result = detectColumns(rows);
+    expect(result).toMatchObject({ mode: 'header', mapping: { code: 0, description: 1, price: 5 } });
+
+    if (result?.mode === 'header') {
+      const quality = runQualityChecks(rows, result.dataStartRow, result.mapping, new Map());
+      expect(quality.validItems).toHaveLength(3);
+      expect(quality.validItems.map((item) => item.price)).toEqual([110.67, 2112.88, 869.3]);
+    }
+  });
 });

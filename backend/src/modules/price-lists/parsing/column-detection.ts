@@ -1,12 +1,23 @@
 import { CellValue } from './workbook-parser';
 import { ColumnMapping, classifyRow } from './row-classification';
+import { parsePrice } from './price-parsing';
 
 export type MappingField = 'code' | 'description' | 'price';
 
 const SYNONYMS: Record<MappingField, string[]> = {
   code: ['codigo', 'cod', 'sku', 'codigo producto', 'cod producto', 'id producto', 'codigo alternativo'],
   description: ['descripcion', 'detalle', 'producto', 'denominacion', 'articulo'],
-  price: ['precio', 'precio neto', 'costo', 'costo neto', 'precio lista', 'importe', 'precio publico'],
+  price: [
+    'precio',
+    'precio neto',
+    'costo',
+    'costo neto',
+    'precio lista',
+    'importe',
+    'precio publico',
+    'importe final',
+    'precio final',
+  ],
 };
 
 function normalizeHeader(value: CellValue): string {
@@ -59,6 +70,27 @@ function matchField(header: string): { field: MappingField; confidence: 'high' |
   return null;
 }
 
+/**
+ * Verifica que una columna candidata a "precio" realmente contenga precios
+ * en los datos, no solo que su encabezado se parezca a un sinónimo. Bug
+ * real con el archivo PreciosBULON: la columna "U. Precio" (unidad de
+ * referencia del precio, ej. "Unidad"/"Kg") matcheaba por distancia de
+ * Levenshtein contra "precio" antes que la columna real "Importe final",
+ * y como nunca se validaba contra los datos, la hoja entera quedaba con 0
+ * filas válidas.
+ */
+function columnLooksLikePrices(rows: CellValue[][], headerRowIndex: number, column: number, sampleSize = 10): boolean {
+  const samples: CellValue[] = [];
+  for (let r = headerRowIndex + 1; r < rows.length && samples.length < sampleSize; r += 1) {
+    const value = rows[r]?.[column] ?? null;
+    if (value !== null) samples.push(value);
+  }
+  if (samples.length === 0) return false;
+
+  const validCount = samples.filter((value) => parsePrice(value) !== null).length;
+  return validCount / samples.length >= 0.6;
+}
+
 export interface HeaderDetectionResult {
   mode: 'header';
   headerRow: number;
@@ -87,13 +119,31 @@ function detectHeaderRow(rows: CellValue[][], maxRowsToScan = 60): HeaderDetecti
   for (let r = 0; r < limit; r += 1) {
     const row = rows[r] ?? [];
     const found: Partial<Record<MappingField, { column: number; confidence: 'high' | 'medium' }>> = {};
+    const priceCandidates: { column: number; confidence: 'high' | 'medium' }[] = [];
 
     row.forEach((cell, columnIndex) => {
       const match = matchField(normalizeHeader(cell));
-      if (match && !found[match.field]) {
+      if (!match) return;
+
+      if (match.field === 'price') {
+        priceCandidates.push({ column: columnIndex, confidence: match.confidence });
+        return;
+      }
+
+      if (!found[match.field]) {
         found[match.field] = { column: columnIndex, confidence: match.confidence };
       }
     });
+
+    // Entre las columnas cuyo encabezado matchea "precio", nos quedamos con
+    // la primera que además contenga precios reales en los datos (alta
+    // confianza antes que media, y a igual confianza, orden de aparición).
+    const validatedPrice = [...priceCandidates]
+      .sort((a, b) => (a.confidence === b.confidence ? 0 : a.confidence === 'high' ? -1 : 1))
+      .find((candidate) => columnLooksLikePrices(rows, r, candidate.column));
+    if (validatedPrice) {
+      found.price = validatedPrice;
+    }
 
     if (found.code && found.description && found.price) {
       return {

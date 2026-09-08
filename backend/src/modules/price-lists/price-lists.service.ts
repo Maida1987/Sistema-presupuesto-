@@ -5,7 +5,7 @@ import { AuditService } from '../../common/interceptors/audit.service';
 import { FileStorageService } from '../../common/storage/file-storage.service';
 import { PricingRulesService } from '../pricing-rules/pricing-rules.service';
 import { calculatePrice } from '../pricing-rules/pricing-engine';
-import { parseWorkbook } from './parsing/workbook-parser';
+import { parseWorkbook, UnsupportedLegacyXlsError } from './parsing/workbook-parser';
 import { detectColumns, detectPositionalStart } from './parsing/column-detection';
 import { extractMetadata } from './parsing/metadata-extraction';
 import { extractCandidateCodes, runQualityChecks, ValidImportRow } from './parsing/quality-checks';
@@ -27,7 +27,7 @@ export class PriceListsService {
     await this.assertSupplierExists(supplierId);
 
     const savedMapping = await this.prisma.importMapping.findUnique({ where: { supplierId } });
-    const parsedSheets = await parseWorkbook(buffer);
+    const parsedSheets = await this.parseWorkbookOrThrow(buffer);
 
     const sheets: SheetPreview[] = [];
     for (const sheet of parsedSheets) {
@@ -86,7 +86,7 @@ export class PriceListsService {
       throw new BadRequestException('No se seleccionó ninguna hoja para importar');
     }
 
-    const parsedSheets = await parseWorkbook(buffer);
+    const parsedSheets = await this.parseWorkbookOrThrow(buffer);
     const storageKey = await this.storage.save(buffer, 'imported-files', '.xlsx');
 
     const importedFile = await this.prisma.importedFile.create({
@@ -279,6 +279,17 @@ export class PriceListsService {
         effectiveFrom: now,
       },
     });
+  }
+
+  private async parseWorkbookOrThrow(buffer: Buffer): Promise<Awaited<ReturnType<typeof parseWorkbook>>> {
+    try {
+      return await parseWorkbook(buffer);
+    } catch (error) {
+      if (error instanceof UnsupportedLegacyXlsError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   private async assertSupplierExists(supplierId: string): Promise<void> {
