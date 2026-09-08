@@ -14,6 +14,7 @@ import { CustomerAccountPage } from './features/accounts/CustomerAccountPage';
 import { NewSettlementPage } from './features/accounts/NewSettlementPage';
 import { SettlementDetailPage } from './features/accounts/SettlementDetailPage';
 import { PaymentDetailPage } from './features/payments/PaymentDetailPage';
+import { AuditLogPage } from './features/audit/AuditLogPage';
 import { AppShell } from './components/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -148,6 +149,16 @@ export function App() {
             <ProtectedRoute>
               <AppShell>
                 <PaymentDetailPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/auditoria"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <AuditLogPage />
               </AppShell>
             </ProtectedRoute>
           }

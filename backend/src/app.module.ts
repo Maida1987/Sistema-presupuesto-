@@ -10,6 +10,9 @@ import { PriceListsModule } from './modules/price-lists/price-lists.module';
 import { DeliveryNotesModule } from './modules/delivery-notes/delivery-notes.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SearchModule } from './modules/search/search.module';
+import { AuditQueryModule } from './modules/audit/audit-query.module';
 import { DocumentCountersModule } from './modules/document-counters/document-counters.module';
 
 @Module({
@@ -25,6 +28,9 @@ import { DocumentCountersModule } from './modules/document-counters/document-cou
     DeliveryNotesModule,
     AccountsModule,
     PaymentsModule,
+    DashboardModule,
+    SearchModule,
+    AuditQueryModule,
     DocumentCountersModule,
   ],
 })

@@ -45,9 +45,9 @@ ambos extremos) para poder crear roles adicionales sin tocar código
 - **Cuenta corriente**: libro de movimientos (remitos pendientes, liquidaciones, pagos, ajustes), saldo siempre trazable a sus movimientos.
 - **Liquidación**: selección de remitos pendientes, cálculo de precio con trazabilidad completa del origen, comparador de precios in-line, confirmación explícita (nunca silenciosa si hay productos sin precio).
 - **Pagos**: registro por medio de pago, impacto automático y transaccional en cuenta corriente, anulación con reverso contable (nunca borrado).
-- **Auditoría**: registro de quién/cuándo/qué para toda operación sensible (precios, liquidaciones, remitos, anulaciones, pagos, clientes).
-- **Dashboard**: indicadores + alertas operativas (ver `05-ux-api-testing-plan.md`).
-- **Buscador global**: cliente/remito/producto/código/cuenta/proveedor en una sola caja de búsqueda.
+- **Auditoría**: registro de quién/cuándo/qué para toda operación sensible (precios, liquidaciones, remitos, anulaciones, pagos, clientes). *Estado: implementado (registro desde Fase 0, consulta filtrable por módulo/entidad desde Fase 6, en `backend/src/modules/audit/`).*
+- **Dashboard**: indicadores + alertas operativas (ver `05-ux-api-testing-plan.md`). *Estado: implementado (Fase 6), en `backend/src/modules/dashboard/`.*
+- **Buscador global**: cliente/remito/producto/código/cuenta/proveedor en una sola caja de búsqueda. *Estado: implementado (Fase 6) para clientes/proveedores/productos/remitos, en `backend/src/modules/search/`; cuentas no tienen entidad propia buscable (se accede vía el cliente).*
 - **Reportes y exportaciones**: PDF/Excel/CSV para clientes, productos, remitos, cuentas.
 
 ## 4. Requisitos no funcionales

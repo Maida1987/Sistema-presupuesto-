@@ -11,16 +11,17 @@ repuestos para camiones, cuyo modelo comercial central es:
 
 ## Estado del proyecto
 
-**El flujo de negocio central está completo: Fases 0 a 5 del plan
+**El flujo de negocio central está completo: Fases 0 a 6 del plan
 implementadas** (infraestructura/auth, catálogo, importación de precios,
-remitos, cuenta corriente/liquidación, pagos). El ciclo completo
+remitos, cuenta corriente/liquidación, pagos, auditoría consultable +
+dashboard + buscador global). El ciclo completo
 `cliente → remito → firma → liquidación → pago` funciona de punta a punta,
 validado contra PostgreSQL real y en el navegador.
 
 | Módulo | Backend (`backend/src/modules/`) | Frontend (`frontend/src/features/`) |
 |---|---|---|
 | Auth / RBAC | `auth/` — JWT access+refresh, permisos (`@RequirePermissions`) | login, ruta protegida |
-| Auditoría | `common/interceptors/audit.service.ts` — invocado por cada servicio de dominio | — |
+| Auditoría | `common/interceptors/audit.service.ts` (registro, invocado por cada servicio de dominio) + `audit/audit.controller.ts` (consulta, `GET /audit-logs` con filtros) | `audit/` — tabla con filtros por módulo/entidad |
 | Clientes / Proveedores | `customers/`, `suppliers/` — CRUD, búsqueda tolerante (`pg_trgm`) | `customers/`, `suppliers/` |
 | Productos | `products/` — maestro + referencias de proveedor, matching por similitud, comparador de precios | `products/` |
 | Importación de listas | `price-lists/` — detección de columnas (sinónimos o posicional), metadata, control de calidad, multi-hoja | `price-lists/` — wizard analizar→previsualizar→confirmar |
@@ -28,6 +29,8 @@ validado contra PostgreSQL real y en el navegador.
 | Remitos | `delivery-notes/` — numeración transaccional, estados, PDF sin precios (`pdf-lib`), adjunto de firma | `delivery-notes/` |
 | Cuenta corriente / Liquidación | `accounts/` — detección de pendientes, resolución de precio con trazabilidad completa, confirmación transaccional, anulación con reverso | `accounts/` |
 | Pagos | `payments/` — registro/anulación, reutiliza el mismo libro de movimientos que Liquidación | `payments/` |
+| Dashboard | `dashboard/` — indicadores (saldo total, cuentas activas, remitos por liquidar) y alertas (listas desactualizadas, productos sin precio, remitos sin firmar, clientes con saldo elevado, variaciones de precio significativas) calculados sobre datos reales | `dashboard/` |
+| Buscador global | `search/` — búsqueda combinada en clientes, proveedores, productos y remitos | `search/` — `GlobalSearch` en el header, con debounce |
 | Numeración segura | `document-counters/` — `SELECT ... FOR UPDATE`, reutilizable dentro de una transacción del llamador | — |
 
 68 tests unitarios (incluyendo una suite de integración contra un Excel
@@ -58,10 +61,16 @@ las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
   Object]"`, y una entidad relacionada inexistente (cliente/producto/
   proveedor) devolvía `500` en vez de un error `400`/`404` claro.
 
+- El dashboard y el buscador global recorren la base completa en cada
+  consulta (sin caché ni paginación más allá de los `take`/límites fijos
+  por sección); funciona bien con el volumen de datos actual pero conviene
+  revisitarlo en la Fase 8 (hardening/performance) si el catálogo crece
+  mucho.
+
 Faltan por implementar (siguientes fases, ver
-`docs/05-ux-api-testing-plan.md §5`): auditoría/dashboard/buscador global
-(Fase 6), reportes y exportaciones (Fase 7), y hardening de producción
-(Fase 8: backups, seguridad, performance a escala, S3/MinIO real).
+`docs/05-ux-api-testing-plan.md §5`): reportes y exportaciones (Fase 7), y
+hardening de producción (Fase 8: backups, seguridad, performance a escala,
+S3/MinIO real).
 
 ## Cómo levantar el entorno de desarrollo
 
