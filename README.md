@@ -48,18 +48,37 @@ las notas de "Estado: implementado" dentro de `docs/03-modelo-de-datos.md`.
   local (`backend/uploads/`, ver `FileStorageService`), no todavía en
   S3/MinIO como propone la arquitectura para producción — la interfaz ya
   está pensada para ese reemplazo sin tocar los servicios que la usan.
-- La importación de Excel es síncrona (sin cola/BullMQ); funciona bien para
-  los volúmenes probados (cientos de filas) pero no está pensada aún para
-  archivos de cientos de miles de filas.
+- La importación de Excel es síncrona (sin cola/BullMQ) y bloquea el único
+  proceso Node mientras procesa: funciona bien para los volúmenes probados
+  de cientos de filas, pero ya es notoria con miles — medido contra un
+  archivo real de 30.066 filas (`PreciosBULON.xlsx`), la previsualización
+  tarda ~70s y la confirmación (que además escribe en base) ~3 min,
+  período en el que el servidor no atiende otras requests. Antes de
+  soportar archivos de decenas/cientos de miles de filas de forma
+  confiable hace falta mover el procesamiento a un worker asincrónico
+  (Fase 8).
+- El *matching* de una referencia de proveedor recién importada con el
+  catálogo maestro de productos es un paso manual/separado (`products.
+  match`): importar una lista deja las referencias en `UNMATCHED` y
+  `price_history` no se calcula hasta que se matchean con un producto (es
+  el diseño documentado en `04-importacion-y-precios.md`, no un bug) — con
+  varios miles de referencias nuevas sin matchear, todavía no hay una
+  forma masiva/asistida de matchear en lote, solo de a una.
 - La liquidación elige automáticamente el proveedor de mejor costo; el
   resto de los candidatos queda visible para comparar, pero todavía no hay
   una UI para elegir manualmente otro proveedor por ítem.
 - Varios bugs reales se encontraron y corrigieron probando contra Postgres
-  real (ver el historial de commits): un adjunto de remito se guardaba
-  siempre con extensión `.pdf` sin importar el archivo real subido, una
-  celda de Excel con hipervínculo anidado se guardaba como `"[object
-  Object]"`, y una entidad relacionada inexistente (cliente/producto/
-  proveedor) devolvía `500` en vez de un error `400`/`404` claro.
+  real y contra archivos de proveedores reales (ver el historial de
+  commits): un adjunto de remito se guardaba siempre con extensión `.pdf`
+  sin importar el archivo real subido, una celda de Excel con hipervínculo
+  anidado se guardaba como `"[object Object]"`, una entidad relacionada
+  inexistente (cliente/producto/proveedor) devolvía `500` en vez de un
+  error `400`/`404` claro, una columna cuyo encabezado se parecía por
+  distancia de edición a "precio" pero no lo era (`"U. Precio"`, la unidad
+  de referencia) se elegía sin validar contra los datos y dejaba una hoja
+  entera de 30 mil filas con 0 ítems válidos, y un archivo `.xls` binario
+  (Excel 97-2003, no soportado por `exceljs`) tiraba un error interno de
+  librería en vez de un mensaje claro.
 
 - El dashboard y el buscador global recorren la base completa en cada
   consulta (sin caché ni paginación más allá de los `take`/límites fijos
